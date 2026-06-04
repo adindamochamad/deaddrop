@@ -52,6 +52,10 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api")
 
+# TrueFoundry Guardrail server endpoints (registered in TrueFoundry Registry)
+from api.guardrail_routes import router as guardrail_router
+app.include_router(guardrail_router)
+
 # ── Mount TrueFoundry MCP Server at /mcp ──────────────────────────────────────
 # TrueFoundry MCP Gateway registers: https://deaddrop.adindamochamad.com/mcp
 # Transport: streamable-http  Auth: Bearer <MCP_SERVER_SECRET>

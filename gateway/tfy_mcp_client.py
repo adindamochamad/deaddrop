@@ -44,6 +44,7 @@ async def _get_tfy_tools_async() -> list:
             "headers": {"Authorization": f"Bearer {TFY_MCP_GATEWAY_KEY}"},
         },
     })
+    # Note: MultiServerMCPClient 0.1+ does NOT support async context manager
     tools = await mcp.get_tools()
     logger.info(f"[TFY-MCP] Discovered {len(tools)} tool(s) from TrueFoundry MCP Gateway")
     return tools
@@ -69,13 +70,21 @@ async def _call_tfy_tool_async(tool_name: str, params: dict) -> dict:
             "headers": {"Authorization": f"Bearer {TFY_MCP_GATEWAY_KEY}"},
         },
     })
-    async with mcp:
-        tools = await mcp.get_tools()
-        tool = next((t for t in tools if t.name == tool_name), None)
-        if tool is None:
-            raise ValueError(f"Tool '{tool_name}' not found in TrueFoundry MCP Gateway")
-        result = await tool.arun(params)
-        return {"status": "success", "result": result, "source": "tfy_mcp_gateway"}
+    # MultiServerMCPClient 0.1+ does NOT support async context manager — call directly
+    tools = await mcp.get_tools()
+    tool = next((t for t in tools if t.name == tool_name), None)
+    if tool is None:
+        raise ValueError(f"Tool '{tool_name}' not found in TrueFoundry MCP Gateway")
+    raw = await tool.arun(params)
+    # Extract text content from LangChain tool response format
+    if isinstance(raw, list) and raw and isinstance(raw[0], dict):
+        content = raw[0].get("text", str(raw))
+        try:
+            import json as _json
+            return {"status": "success", "result": _json.loads(content), "source": "tfy_mcp_gateway"}
+        except Exception:
+            return {"status": "success", "result": content, "source": "tfy_mcp_gateway"}
+    return {"status": "success", "result": raw, "source": "tfy_mcp_gateway"}
 
 
 # ── Unified call_tool — routes to TrueFoundry or local mock ──────────────────

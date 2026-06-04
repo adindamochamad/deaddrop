@@ -2,267 +2,696 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DeadDrop — Live Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0d1117; --surface: #161b22; --border: #30363d;
-      --text: #e6edf3; --muted: #8b949e;
-      --blue: #58a6ff; --green: #3fb950; --orange: #f0883e; --red: #f85149;
-    }
-    body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', 'Fira Code', monospace; padding: 20px; font-size: 13px; }
 
-    header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
-    header h1 { color: var(--blue); font-size: 1.5rem; letter-spacing: -.5px; }
-    header .tagline { color: var(--muted); font-size: 0.8rem; }
-    .badge { display: inline-flex; align-items: center; gap: 5px; background: #12261e; color: var(--green); border: 1px solid var(--green); border-radius: 12px; padding: 2px 10px; font-size: 0.72rem; font-weight: 700; }
-    .badge::before { content: '●'; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+    /* ── Color system (Vercel zinc-inspired) ── */
+    :root {
+      --bg:        #09090b;
+      --surface:   #111113;
+      --surface-2: #18181b;
+      --border:    #27272a;
+      --border-2:  #3f3f46;
+      --text:      #fafafa;
+      --text-2:    #a1a1aa;
+      --text-3:    #71717a;
+
+      --green:       #22c55e;
+      --green-bg:    rgba(34,197,94,.07);
+      --green-bdr:   rgba(34,197,94,.22);
+      --red:         #ef4444;
+      --red-bg:      rgba(239,68,68,.07);
+      --red-bdr:     rgba(239,68,68,.22);
+      --orange:      #f97316;
+      --orange-bg:   rgba(249,115,22,.07);
+      --orange-bdr:  rgba(249,115,22,.22);
+      --blue:        #3b82f6;
+      --blue-bg:     rgba(59,130,246,.07);
+      --blue-bdr:    rgba(59,130,246,.22);
+      --purple:      #a855f7;
+      --purple-bg:   rgba(168,85,247,.07);
+      --purple-bdr:  rgba(168,85,247,.22);
+    }
+
+    html { color-scheme: dark; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Dot grid overlay — Vercel signature */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, #3f3f46 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: .15;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative; z-index: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px 24px 48px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -.04em;
+      background: linear-gradient(135deg, #fff 20%, #71717a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .tagline { color: var(--text-3); font-size: 0.78rem; }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--green-bg);
+      border: 1px solid var(--green-bdr);
+      color: var(--green);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: ping 1.8s ease-in-out infinite;
+    }
+    @keyframes ping {
+      0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+      55%      { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+    }
 
     /* ── Metric cards ── */
-    .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; }
-    .card .label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
-    .card .value { font-size: 1.9rem; font-weight: 700; }
-    .card.blue   .value { color: var(--blue); }
-    .card.green  .value { color: var(--green); }
-    .card.orange .value { color: var(--orange); }
-    .card.red    .value { color: var(--red); }
-    .recovery-ms .value { font-size: 1.3rem; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    @media(max-width:1100px){ .metrics { grid-template-columns: repeat(4,1fr); } }
+    @media(max-width:600px) { .metrics { grid-template-columns: repeat(2,1fr); } }
 
-    /* ── Layout grid ── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    @media(max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s, transform .15s;
+    }
+    .metric-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
+    /* Colored left accent bar */
+    .metric-card::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 10px 0 0 10px;
+    }
+    .metric-card.green::before  { background: var(--green); }
+    .metric-card.red::before    { background: var(--red); }
+    .metric-card.blue::before   { background: var(--blue); }
+    .metric-card.orange::before { background: var(--orange); }
+    .metric-card.purple::before { background: var(--purple); }
 
-    /* ── Panels ── */
-    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
-    .panel h2 { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
-    .panel.chaos h2 { color: var(--orange); }
+    .metric-label {
+      font-size: 0.64rem;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      margin-bottom: 8px;
+    }
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric-card.green  .metric-value { color: var(--green); }
+    .metric-card.red    .metric-value { color: var(--red); }
+    .metric-card.blue   .metric-value { color: var(--blue); }
+    .metric-card.orange .metric-value { color: var(--orange); }
+    .metric-card.purple .metric-value { color: var(--purple); font-size: 1.4rem; }
 
-    /* ── Live log ── */
-    .log-box { height: 240px; overflow-y: auto; scroll-behavior: smooth; }
-    .log-line { padding: 2px 0; line-height: 1.55; white-space: pre-wrap; word-break: break-all; }
-    .log-line .ts  { color: #484f58; margin-right: 6px; }
-    .log-line.info    .msg { color: var(--muted); }
-    .log-line.warn    .msg { color: var(--orange); }
-    .log-line.success .msg { color: var(--green); }
-    .log-line.error   .msg { color: var(--red); }
+    /* ── Two-column layout ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 288px;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media(max-width:900px){ .main-grid { grid-template-columns: 1fr; } }
+
+    /* ── Panel base ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.015);
+    }
+    .panel-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: .09em;
+    }
+    .panel-hint { font-size: 0.65rem; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Log terminal — Better Stack / Logtail inspired ── */
+    .log-terminal {
+      height: 320px;
+      overflow-y: auto;
+      padding: 6px 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      background: #080809;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-2) transparent;
+    }
+    .log-terminal::-webkit-scrollbar { width: 4px; }
+    .log-terminal::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 88px 8px 74px 1fr;
+      align-items: start;
+      gap: 8px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      line-height: 1.65;
+      transition: background .08s;
+    }
+    .log-row:hover { background: rgba(255,255,255,.03); }
+    .log-ts  { color: var(--text-3); font-size: 0.7rem; padding-top: 1px; }
+    .log-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+    .log-row.info    .log-dot { background: #3f3f46; }
+    .log-row.warn    .log-dot { background: var(--orange); box-shadow: 0 0 5px rgba(249,115,22,.5); }
+    .log-row.success .log-dot { background: var(--green);  box-shadow: 0 0 5px rgba(34,197,94,.5); }
+    .log-row.error   .log-dot { background: var(--red);    box-shadow: 0 0 5px rgba(239,68,68,.5); }
+    .log-job  { color: var(--text-3); font-size: 0.7rem; padding-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .log-msg  { color: var(--text-2); word-break: break-word; }
+    .log-row.warn    .log-msg { color: var(--orange); }
+    .log-row.success .log-msg { color: var(--green); }
+    .log-row.error   .log-msg { color: var(--red); }
+
+    /* ── Sidebar stack ── */
+    .side-stack { display: flex; flex-direction: column; gap: 14px; }
+
+    .feed-list { list-style: none; }
+    .feed-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.74rem;
+      gap: 8px;
+      transition: background .1s;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-item:hover { background: rgba(255,255,255,.02); }
+    .feed-name { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .feed-meta { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 0.68rem; flex-shrink: 0; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 20px;
+      font-size: 0.63rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge.success    { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-bdr); }
+    .badge.rate_limited { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange-bdr); }
+    .badge.timeout    { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange-bdr); }
+    .badge.error      { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-bdr); }
+    .badge.blocked    { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-bdr); }
+    .badge.redacted   { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange-bdr); }
+    .badge.validated  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-bdr); }
 
     /* ── Jobs table ── */
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; padding: 6px 10px; color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); }
-    td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
-    .pill { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
-    .pill.pending    { background: #21262d; color: var(--muted); }
-    .pill.analyzing, .pill.generating, .pill.validating, .pill.deploying { background: #1f2d45; color: var(--blue); }
-    .pill.done       { background: #12261e; color: var(--green); }
-    .pill.failed, .pill.rollback { background: #2d1215; color: var(--red); }
+    .table-wrap { margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.77rem; }
+    thead th {
+      padding: 9px 14px;
+      text-align: left;
+      font-size: 0.63rem;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      background: rgba(255,255,255,.015);
+    }
+    tbody tr { transition: background .1s; }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+    tbody td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-2);
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
 
-    /* ── Provider / guardrails mini-log ── */
-    .mini-log { list-style: none; }
-    .mini-log li { padding: 4px 0; border-bottom: 1px solid #21262d; font-size: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
-    .mini-log li:last-child { border-bottom: none; }
-    .tag { padding: 1px 7px; border-radius: 8px; font-size: 0.68rem; font-weight: 700; }
-    .tag.success  { background: #12261e; color: var(--green); }
-    .tag.rate_limited { background: #2d1f0e; color: var(--orange); }
-    .tag.timeout  { background: #2d1f0e; color: var(--orange); }
-    .tag.error    { background: #2d1215; color: var(--red); }
-    .tag.blocked  { background: #2d1215; color: var(--red); }
-    .tag.redacted { background: #2d1f0e; color: var(--orange); }
-    .tag.validated { background: #12261e; color: var(--green); }
+    .job-id-cell {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-3);
+      font-size: 0.7rem;
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 10px 2px 7px;
+      border-radius: 20px;
+      font-size: 0.67rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+    }
+    .status-pill::before { content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .status-pill.pending    { background:rgba(113,113,122,.1); color:var(--text-3); }
+    .status-pill.pending::before { background:var(--text-3); }
+    .status-pill.analyzing,
+    .status-pill.generating,
+    .status-pill.validating,
+    .status-pill.deploying  { background:var(--blue-bg); color:var(--blue); }
+    .status-pill.analyzing::before,
+    .status-pill.generating::before,
+    .status-pill.validating::before,
+    .status-pill.deploying::before { background:var(--blue); animation: blink .9s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .status-pill.done       { background:var(--green-bg);  color:var(--green); }
+    .status-pill.done::before { background:var(--green); }
+    .status-pill.failed,
+    .status-pill.rollback   { background:var(--red-bg); color:var(--red); }
+    .status-pill.failed::before { background:var(--red); }
+    .tabnum { font-variant-numeric: tabular-nums; }
 
-    /* ── Chaos panel ── */
-    .chaos-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    button { padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; font-family: inherit; transition: opacity .15s; }
-    button:hover { opacity: .8; }
-    button:active { opacity: .6; }
-    .btn-deploy  { background: #1f2d45; color: var(--blue);   border: 1px solid var(--blue); }
-    .btn-chaos   { background: #2d1215; color: var(--red);    border: 1px solid var(--red); }
-    .btn-warn    { background: #2d1f0e; color: var(--orange); border: 1px solid var(--orange); }
-    .btn-reset   { background: #12261e; color: var(--green);  border: 1px solid var(--green); }
+    /* ── Scenario cards — Railway-inspired ── */
+    .scenarios-wrap { margin-bottom: 0; }
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      padding: 14px 16px;
+    }
+    @media(max-width:1000px){ .scenario-grid { grid-template-columns: repeat(3,1fr); } }
+    @media(max-width:560px) { .scenario-grid { grid-template-columns: repeat(2,1fr); } }
+
+    .sc-card {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 11px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .15s, background .15s, transform .12s;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+    }
+    .sc-card:hover { border-color: var(--border-2); background: rgba(255,255,255,.035); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+    .sc-card:active { transform: translateY(0); box-shadow: none; }
+    .sc-card.c-green  { border-color: var(--green-bdr);  }
+    .sc-card.c-green:hover  { border-color: var(--green);  background: var(--green-bg); }
+    .sc-card.c-red    { border-color: var(--red-bdr);    }
+    .sc-card.c-red:hover    { border-color: var(--red);    background: var(--red-bg); }
+    .sc-card.c-orange { border-color: var(--orange-bdr); }
+    .sc-card.c-orange:hover { border-color: var(--orange); background: var(--orange-bg); }
+    .sc-card.c-reset  { border-color: var(--border); }
+    .sc-card.c-reset:hover  { border-color: var(--green-bdr); background: var(--green-bg); }
+
+    .sc-icon  { font-size: 1.05rem; margin-bottom: 3px; line-height: 1; }
+    .sc-name  { font-size: 0.76rem; font-weight: 600; color: var(--text); }
+    .sc-desc  { font-size: 0.64rem; color: var(--text-3); line-height: 1.35; margin-top: 1px; }
+
+    /* Manual chaos section */
+    .manual-section {
+      border-top: 1px solid var(--border);
+      padding: 0;
+    }
+    summary {
+      padding: 8px 16px;
+      font-size: 0.69rem;
+      color: var(--text-3);
+      cursor: pointer;
+      list-style: none;
+      display: flex; align-items: center; gap: 6px;
+      transition: color .15s;
+    }
+    summary:hover { color: var(--text-2); }
+    summary::-webkit-details-marker { display: none; }
+    summary::before { content: '▸'; font-size: 0.6rem; transition: transform .15s; }
+    details[open] summary::before { transform: rotate(90deg); }
+
+    .manual-btns {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px 16px 14px;
+    }
+    .mbtn {
+      padding: 4px 11px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-3);
+      font-size: 0.7rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .mbtn:hover { border-color: var(--border-2); color: var(--text-2); background: var(--surface-2); }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-3);
+      font-size: 0.67rem;
+    }
+    footer a { color: var(--text-3); text-decoration: none; }
+    footer a:hover { color: var(--text-2); text-decoration: underline; }
   </style>
 </head>
 <body>
+<div class="container">
 
-<header>
-  <h1>DeadDrop</h1>
-  <span class="tagline">"Infrastructure dies. Your agent doesn't."</span>
-  <span class="badge">LIVE</span>
-</header>
-
-<!-- Metric cards -->
-<div class="metrics">
-  <div class="card green">  <div class="label">Jobs Done</div>      <div class="value" id="m-done">—</div></div>
-  <div class="card red">    <div class="label">Jobs Failed</div>    <div class="value" id="m-failed">—</div></div>
-  <div class="card blue">   <div class="label">In Progress</div>    <div class="value" id="m-inprog">—</div></div>
-  <div class="card orange"> <div class="label">Provider Switches</div><div class="value" id="m-switches">—</div></div>
-  <div class="card orange"> <div class="label">Tool Failures</div>  <div class="value" id="m-tools">—</div></div>
-  <div class="card red">    <div class="label">Guardrails Blocked</div><div class="value" id="m-gr">—</div></div>
-  <div class="card blue recovery-ms"><div class="label">Total Recovery</div><div class="value" id="m-recovery">—</div></div>
-</div>
-
-<!-- Demo scenario panel -->
-<div class="panel chaos" style="margin-bottom:16px">
-  <h2>Demo Scenarios</h2>
-  <div class="chaos-buttons" style="margin-bottom:12px">
-    <button class="btn-deploy" onclick="runScenario('normal')">▶ A: Normal Deploy</button>
-    <button class="btn-chaos"  onclick="runScenario('rate_limit')">▶ B: Rate Limit → Fallback</button>
-    <button class="btn-warn"   onclick="runScenario('slow_response')">▶ B2: Slow Response → Timeout</button>
-    <button class="btn-warn"   onclick="runScenario('tool_timeout')">▶ C: Tool Timeout → Fallback</button>
-    <button class="btn-chaos"  onclick="runScenario('full_chaos')">▶ D: Full Chaos (Cascading)</button>
-    <button class="btn-reset"  onclick="chaosReset()">↺ Reset All Chaos</button>
-  </div>
-  <details style="margin-top:6px">
-    <summary style="color:var(--muted);font-size:0.72rem;cursor:pointer">Manual chaos controls</summary>
-    <div class="chaos-buttons" style="margin-top:8px">
-      <button class="btn-deploy" onclick="triggerJob()">Trigger Job Only</button>
-      <button class="btn-chaos"  onclick="chaos('rate_limit',     'aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Rate Limit Sonnet</button>
-      <button class="btn-chaos"  onclick="chaos('provider_outage','aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Outage Sonnet</button>
-      <button class="btn-warn"   onclick="chaos('slow_response',  'aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Slow Response Sonnet</button>
-      <button class="btn-warn"   onclick="chaos('tool_timeout',   'github_deploy')">Timeout Deploy Tool</button>
-      <button class="btn-chaos"  onclick="chaos('quarantine_tool','github_deploy')">Quarantine Tool</button>
-      <button class="btn-warn"   onclick="post('/api/chaos/bad_output')">Bad LLM Output</button>
+  <!-- ── Header ── -->
+  <header>
+    <div class="header-left">
+      <span class="logo">DeadDrop</span>
+      <span class="tagline">"Infrastructure dies. Your agent doesn't."</span>
     </div>
-  </details>
-</div>
+    <div class="live-badge">
+      <span class="live-dot"></span>
+      Live
+    </div>
+  </header>
 
-<!-- Main content grid -->
-<div class="grid-2">
-  <!-- Live log -->
-  <div class="panel" style="grid-column: 1 / -1;">
-    <h2>Live Agent Log</h2>
-    <div class="log-box" id="live-log"></div>
+  <!-- ── Metric cards ── -->
+  <div class="metrics">
+    <div class="metric-card green">
+      <div class="metric-label">Jobs Done</div>
+      <div class="metric-value" id="m-done">—</div>
+    </div>
+    <div class="metric-card red">
+      <div class="metric-label">Failed</div>
+      <div class="metric-value" id="m-failed">—</div>
+    </div>
+    <div class="metric-card blue">
+      <div class="metric-label">In Progress</div>
+      <div class="metric-value" id="m-inprog">—</div>
+    </div>
+    <div class="metric-card orange">
+      <div class="metric-label">Provider Switches</div>
+      <div class="metric-value" id="m-switches">—</div>
+    </div>
+    <div class="metric-card orange">
+      <div class="metric-label">Tool Failures</div>
+      <div class="metric-value" id="m-tools">—</div>
+    </div>
+    <div class="metric-card red">
+      <div class="metric-label">Guardrails Blocked</div>
+      <div class="metric-value" id="m-gr">—</div>
+    </div>
+    <div class="metric-card purple">
+      <div class="metric-label">Total Recovery</div>
+      <div class="metric-value" id="m-recovery">—</div>
+    </div>
   </div>
-</div>
 
-<div class="grid-3">
-  <!-- Jobs -->
-  <div class="panel" style="grid-column: 1 / span 2;">
-    <h2>Recent Jobs</h2>
+  <!-- ── Main: log + sidebar ── -->
+  <div class="main-grid">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Agent Live Log</span>
+        <span class="panel-hint">SSE · real-time</span>
+      </div>
+      <div class="log-terminal" id="live-log"></div>
+    </div>
+
+    <div class="side-stack">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">AI Gateway</span></div>
+        <ul class="feed-list" id="provider-log">
+          <li class="feed-item"><span class="feed-name" style="color:var(--text-3)">Waiting for calls…</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Guardrails</span></div>
+        <ul class="feed-list" id="guardrails-log">
+          <li class="feed-item"><span class="feed-name" style="color:var(--text-3)">No events yet</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Jobs table ── -->
+  <div class="panel table-wrap">
+    <div class="panel-header">
+      <span class="panel-title">Recent Jobs</span>
+    </div>
     <table>
-      <thead><tr>
-        <th>Job ID</th><th>Status</th><th>Switches</th><th>Tool Fails</th><th>Retries</th><th>Recovery</th><th>Created</th>
-      </tr></thead>
-      <tbody id="jobs-tbody"></tbody>
+      <thead>
+        <tr>
+          <th>Job ID</th><th>Status</th><th>Prov. Switches</th>
+          <th>Tool Failures</th><th>Guardrails</th><th>Retries</th>
+          <th>Recovery</th><th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="jobs-tbody">
+        <tr><td colspan="8" style="color:var(--text-3);text-align:center;padding:20px">No jobs yet</td></tr>
+      </tbody>
     </table>
   </div>
 
-  <!-- Side panels -->
-  <div style="display:flex; flex-direction:column; gap:12px;">
-    <div class="panel">
-      <h2>Provider Log</h2>
-      <ul class="mini-log" id="provider-log"><li style="color:var(--muted)">Waiting...</li></ul>
+  <!-- ── Demo scenarios ── -->
+  <div class="panel scenarios-wrap">
+    <div class="panel-header">
+      <span class="panel-title">Demo Scenarios</span>
+      <span class="panel-hint">Resilient Agents Hackathon · TrueFoundry × AWS Bedrock</span>
     </div>
-    <div class="panel">
-      <h2>Guardrails Log</h2>
-      <ul class="mini-log" id="guardrails-log"><li style="color:var(--muted)">Waiting...</li></ul>
+    <div class="scenario-grid">
+      <button class="sc-card c-green" onclick="runScenario('normal')">
+        <span class="sc-icon">▶</span>
+        <span class="sc-name">A — Normal</span>
+        <span class="sc-desc">Clean run, no failures injected</span>
+      </button>
+      <button class="sc-card c-red" onclick="runScenario('rate_limit')">
+        <span class="sc-icon">⏳</span>
+        <span class="sc-name">B — Rate Limit</span>
+        <span class="sc-desc">Sonnet 429 → Mistral fallback</span>
+      </button>
+      <button class="sc-card c-orange" onclick="runScenario('slow_response')">
+        <span class="sc-icon">⌛</span>
+        <span class="sc-name">B2 — Slow Response</span>
+        <span class="sc-desc">Forced timeout → switch provider</span>
+      </button>
+      <button class="sc-card c-orange" onclick="runScenario('tool_timeout')">
+        <span class="sc-icon">🔧</span>
+        <span class="sc-name">C — Tool Timeout</span>
+        <span class="sc-desc">github_deploy → notifier fallback</span>
+      </button>
+      <button class="sc-card c-red" onclick="runScenario('full_chaos')">
+        <span class="sc-icon">💥</span>
+        <span class="sc-name">D — Full Chaos</span>
+        <span class="sc-desc">Cascading: outage + quarantine + bad output</span>
+      </button>
+      <button class="sc-card c-reset" onclick="chaosReset()">
+        <span class="sc-icon">↺</span>
+        <span class="sc-name">Reset All</span>
+        <span class="sc-desc">Clear all injected failures</span>
+      </button>
+    </div>
+
+    <div class="manual-section">
+      <details>
+        <summary>Manual chaos controls</summary>
+        <div class="manual-btns">
+          <button class="mbtn" onclick="triggerJob()">Trigger Job Only</button>
+          <button class="mbtn" onclick="chaos('rate_limit','aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Rate Limit Sonnet</button>
+          <button class="mbtn" onclick="chaos('provider_outage','aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Outage Sonnet</button>
+          <button class="mbtn" onclick="chaos('slow_response','aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Slow Response Sonnet</button>
+          <button class="mbtn" onclick="chaos('tool_timeout','github_deploy')">Timeout Deploy Tool</button>
+          <button class="mbtn" onclick="chaos('quarantine_tool','github_deploy')">Quarantine Tool</button>
+          <button class="mbtn" onclick="post('/api/chaos/bad_output')">Bad LLM Output</button>
+        </div>
+      </details>
     </div>
   </div>
+
+  <footer>
+    <span>DeadDrop · Built for <a href="https://www.builderbase.com/v2/event/resilient-agents-online-hackathon" target="_blank">Resilient Agents Online Hackathon</a></span>
+    <span><a href="https://github.com/adindamochamad/deaddrop" target="_blank">github.com/adindamochamad/deaddrop</a></span>
+  </footer>
 </div>
 
 <script>
   // ── SSE live log ────────────────────────────────────────────────────────────
   const logBox = document.getElementById('live-log');
-  const MAX_LOG_LINES = 200;
+  const MAX_LINES = 300;
 
-  function addLogLine(event) {
-    const line = document.createElement('div');
-    line.className = `log-line ${event.level}`;
-    const ts = new Date(event.ts * 1000).toISOString().slice(11, 23);
-    const jobLabel = event.job_id === 'system' ? '[system]' : `[${event.job_id.slice(0,8)}]`;
-    line.innerHTML = `<span class="ts">${ts}</span><span class="msg">${jobLabel} ${escHtml(event.message)}</span>`;
-    logBox.appendChild(line);
-    // Trim old lines
-    while (logBox.children.length > MAX_LOG_LINES) logBox.removeChild(logBox.firstChild);
+  function addLogLine(ev) {
+    const row = document.createElement('div');
+    row.className = `log-row ${ev.level}`;
+    const ts  = new Date(ev.ts * 1000).toISOString().slice(11, 23);
+    const job = ev.job_id === 'system' ? '[system]  ' : `[${ev.job_id.slice(0,8)}]`;
+    row.innerHTML =
+      `<span class="log-ts">${ts}</span>` +
+      `<span class="log-dot"></span>` +
+      `<span class="log-job">${job}</span>` +
+      `<span class="log-msg">${esc(ev.message)}</span>`;
+    logBox.appendChild(row);
+    while (logBox.children.length > MAX_LINES) logBox.removeChild(logBox.firstChild);
     logBox.scrollTop = logBox.scrollHeight;
   }
 
   const sse = new EventSource('/api/events');
-  sse.onmessage = e => {
-    try { addLogLine(JSON.parse(e.data)); } catch {}
-  };
-  sse.onerror = () => addLogLine({job_id:'system', level:'warn', message:'SSE disconnected — reconnecting...', ts: Date.now()/1000});
+  sse.onmessage = e => { try { addLogLine(JSON.parse(e.data)); } catch {} };
+  sse.onerror   = () => addLogLine({ job_id:'system', level:'warn', message:'SSE disconnected — reconnecting…', ts: Date.now()/1000 });
 
-  // ── Metrics polling ─────────────────────────────────────────────────────────
+  // ── Metrics polling ──────────────────────────────────────────────────────────
   async function fetchMetrics() {
     try {
       const d = await (await fetch('/api/metrics')).json();
-      document.getElementById('m-done').textContent     = d.done;
-      document.getElementById('m-failed').textContent   = d.failed;
-      document.getElementById('m-inprog').textContent   = d.in_progress;
-      document.getElementById('m-switches').textContent = d.provider_switches;
-      document.getElementById('m-tools').textContent    = d.tool_failures;
-      document.getElementById('m-gr').textContent       = d.guardrails_blocked;
-      document.getElementById('m-recovery').textContent = d.total_recovery_ms > 0
-        ? (d.total_recovery_ms / 1000).toFixed(2) + 's'
-        : '—';
-
-      renderProviderLog(d.recent_providers || []);
+      setText('m-done',     d.done);
+      setText('m-failed',   d.failed);
+      setText('m-inprog',   d.in_progress);
+      setText('m-switches', d.provider_switches);
+      setText('m-tools',    d.tool_failures);
+      setText('m-gr',       d.guardrails_blocked);
+      setText('m-recovery', d.total_recovery_ms > 0 ? (d.total_recovery_ms/1000).toFixed(1)+'s' : '—');
+      renderProviderLog(d.recent_providers   || []);
       renderGuardrailsLog(d.recent_guardrails || []);
     } catch {}
   }
 
+  function setText(id, v) {
+    const el = document.getElementById(id);
+    if (el && String(el.textContent) !== String(v)) el.textContent = v;
+  }
+
   function renderProviderLog(entries) {
     const ul = document.getElementById('provider-log');
-    if (!entries.length) { ul.innerHTML = '<li style="color:var(--muted)">No calls yet</li>'; return; }
+    if (!entries.length) {
+      ul.innerHTML = '<li class="feed-item"><span class="feed-name" style="color:var(--text-3)">No calls yet</span></li>';
+      return;
+    }
     ul.innerHTML = entries.map(p => `
-      <li>
-        <span>${shortModel(p.model)}</span>
-        <span>
-          ${p.latency_ms ? p.latency_ms + 'ms' : ''}
-          <span class="tag ${p.status}">${p.status}</span>
+      <li class="feed-item">
+        <span class="feed-name">${shortModel(p.model)}</span>
+        <span class="feed-meta">
+          ${p.latency_ms > 0 ? `<span>${p.latency_ms}ms</span>` : ''}
+          <span class="badge ${p.status}">${p.status.replace('_',' ')}</span>
         </span>
       </li>`).join('');
   }
 
   function renderGuardrailsLog(entries) {
     const ul = document.getElementById('guardrails-log');
-    if (!entries.length) { ul.innerHTML = '<li style="color:var(--muted)">No events yet</li>'; return; }
+    if (!entries.length) {
+      ul.innerHTML = '<li class="feed-item"><span class="feed-name" style="color:var(--text-3)">No events yet</span></li>';
+      return;
+    }
     ul.innerHTML = entries.map(g => `
-      <li>
-        <span>${g.rule}</span>
-        <span class="tag ${g.action}">${g.action}</span>
+      <li class="feed-item">
+        <span class="feed-name">${g.rule.replace(/_/g,' ')}</span>
+        <span class="badge ${g.action}">${g.action}</span>
       </li>`).join('');
   }
 
-  // ── Jobs table polling ──────────────────────────────────────────────────────
+  // ── Jobs table ───────────────────────────────────────────────────────────────
   async function fetchJobs() {
     try {
       const jobs = await (await fetch('/api/jobs')).json();
       const tbody = document.getElementById('jobs-tbody');
-      tbody.innerHTML = jobs.map(j => `
-        <tr>
-          <td style="font-size:.7rem;color:var(--muted)">${j.id.slice(0,8)}</td>
-          <td><span class="pill ${j.status}">${j.status}</span></td>
-          <td>${j.provider_switches ?? 0}</td>
-          <td>${j.tool_failures ?? 0}</td>
-          <td>${j.retry_count ?? 0}</td>
-          <td>${j.total_recovery_ms > 0 ? (j.total_recovery_ms/1000).toFixed(2)+'s' : '—'}</td>
-          <td style="color:var(--muted)">${(j.created_at||'').slice(0,19)}</td>
-        </tr>`).join('');
+      if (!jobs.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-3);text-align:center;padding:20px">No jobs yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = jobs.map(j => {
+        const rec = j.total_recovery_ms || 0;
+        return `<tr>
+          <td class="job-id-cell">${j.id.slice(0,8)}</td>
+          <td><span class="status-pill ${j.status}">${j.status}</span></td>
+          <td class="tabnum">${j.provider_switches  ?? 0}</td>
+          <td class="tabnum">${j.tool_failures      ?? 0}</td>
+          <td class="tabnum">${j.guardrails_blocked ?? 0}</td>
+          <td class="tabnum">${j.retry_count        ?? 0}</td>
+          <td class="tabnum" style="color:${rec>0?'var(--purple)':'var(--text-3)'}">
+            ${rec > 0 ? (rec/1000).toFixed(2)+'s' : '—'}
+          </td>
+          <td style="color:var(--text-3);white-space:nowrap;font-size:.7rem">${(j.created_at||'').slice(11,19)}</td>
+        </tr>`;
+      }).join('');
     } catch {}
   }
 
-  // ── Chaos helpers ───────────────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   async function post(url, body={}) {
-    await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    try { await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); }
+    catch {}
   }
-  const triggerJob = () => post('/api/jobs', {service:'payment-service', version:'v2.4.1', target_env:'staging', replicas:3, image:'gcr.io/co/payment:v2.4.1'});
-  const chaos = (type, target) => post(`/api/chaos/${type}`, {target});
-  const chaosReset = () => post('/api/chaos/reset');
-  const runScenario = (name) => post('/api/scenario', {scenario: name});
+  const triggerJob  = () => post('/api/jobs', { service:'payment-service', version:'v2.4.1', target_env:'staging', replicas:3 });
+  const chaos       = (t, target) => post(`/api/chaos/${t}`, { target });
+  const chaosReset  = () => post('/api/chaos/reset');
+  const runScenario = n => post('/api/scenario', { scenario: n });
 
-  // ── Utilities ───────────────────────────────────────────────────────────────
   const shortModel = m => {
-    if (m.includes('claude-sonnet'))   return 'Claude Sonnet';
-    if (m.includes('mistral'))         return 'Mistral Large';
-    if (m.includes('llama'))           return 'Llama 3.1 70B';
+    if (m.includes('claude-sonnet')) return 'Claude Sonnet 4.6';
+    if (m.includes('mistral'))       return 'Mistral Large';
+    if (m.includes('llama'))         return 'Llama 3.1 70B';
     return m;
   };
-  const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  // ── Boot ────────────────────────────────────────────────────────────────────
+  // ── Boot ─────────────────────────────────────────────────────────────────────
   fetchMetrics(); fetchJobs();
   setInterval(() => { fetchMetrics(); fetchJobs(); }, 2000);
 </script>

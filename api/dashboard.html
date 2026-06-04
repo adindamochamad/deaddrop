@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DeadDrop — Live Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e;
+      --blue: #58a6ff; --green: #3fb950; --orange: #f0883e; --red: #f85149;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', 'Fira Code', monospace; padding: 20px; font-size: 13px; }
+
+    header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
+    header h1 { color: var(--blue); font-size: 1.5rem; letter-spacing: -.5px; }
+    header .tagline { color: var(--muted); font-size: 0.8rem; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; background: #12261e; color: var(--green); border: 1px solid var(--green); border-radius: 12px; padding: 2px 10px; font-size: 0.72rem; font-weight: 700; }
+    .badge::before { content: '●'; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+    /* ── Metric cards ── */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; }
+    .card .label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .card .value { font-size: 1.9rem; font-weight: 700; }
+    .card.blue   .value { color: var(--blue); }
+    .card.green  .value { color: var(--green); }
+    .card.orange .value { color: var(--orange); }
+    .card.red    .value { color: var(--red); }
+    .recovery-ms .value { font-size: 1.3rem; }
+
+    /* ── Layout grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media(max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    /* ── Panels ── */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .panel h2 { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+    .panel.chaos h2 { color: var(--orange); }
+
+    /* ── Live log ── */
+    .log-box { height: 240px; overflow-y: auto; scroll-behavior: smooth; }
+    .log-line { padding: 2px 0; line-height: 1.55; white-space: pre-wrap; word-break: break-all; }
+    .log-line .ts  { color: #484f58; margin-right: 6px; }
+    .log-line.info    .msg { color: var(--muted); }
+    .log-line.warn    .msg { color: var(--orange); }
+    .log-line.success .msg { color: var(--green); }
+    .log-line.error   .msg { color: var(--red); }
+
+    /* ── Jobs table ── */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 6px 10px; color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); }
+    td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+    .pill { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+    .pill.pending    { background: #21262d; color: var(--muted); }
+    .pill.analyzing, .pill.generating, .pill.validating, .pill.deploying { background: #1f2d45; color: var(--blue); }
+    .pill.done       { background: #12261e; color: var(--green); }
+    .pill.failed, .pill.rollback { background: #2d1215; color: var(--red); }
+
+    /* ── Provider / guardrails mini-log ── */
+    .mini-log { list-style: none; }
+    .mini-log li { padding: 4px 0; border-bottom: 1px solid #21262d; font-size: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
+    .mini-log li:last-child { border-bottom: none; }
+    .tag { padding: 1px 7px; border-radius: 8px; font-size: 0.68rem; font-weight: 700; }
+    .tag.success  { background: #12261e; color: var(--green); }
+    .tag.rate_limited { background: #2d1f0e; color: var(--orange); }
+    .tag.timeout  { background: #2d1f0e; color: var(--orange); }
+    .tag.error    { background: #2d1215; color: var(--red); }
+    .tag.blocked  { background: #2d1215; color: var(--red); }
+    .tag.redacted { background: #2d1f0e; color: var(--orange); }
+    .tag.validated { background: #12261e; color: var(--green); }
+
+    /* ── Chaos panel ── */
+    .chaos-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    button { padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; font-family: inherit; transition: opacity .15s; }
+    button:hover { opacity: .8; }
+    button:active { opacity: .6; }
+    .btn-deploy  { background: #1f2d45; color: var(--blue);   border: 1px solid var(--blue); }
+    .btn-chaos   { background: #2d1215; color: var(--red);    border: 1px solid var(--red); }
+    .btn-warn    { background: #2d1f0e; color: var(--orange); border: 1px solid var(--orange); }
+    .btn-reset   { background: #12261e; color: var(--green);  border: 1px solid var(--green); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>DeadDrop</h1>
+  <span class="tagline">"Infrastructure dies. Your agent doesn't."</span>
+  <span class="badge">LIVE</span>
+</header>
+
+<!-- Metric cards -->
+<div class="metrics">
+  <div class="card green">  <div class="label">Jobs Done</div>      <div class="value" id="m-done">—</div></div>
+  <div class="card red">    <div class="label">Jobs Failed</div>    <div class="value" id="m-failed">—</div></div>
+  <div class="card blue">   <div class="label">In Progress</div>    <div class="value" id="m-inprog">—</div></div>
+  <div class="card orange"> <div class="label">Provider Switches</div><div class="value" id="m-switches">—</div></div>
+  <div class="card orange"> <div class="label">Tool Failures</div>  <div class="value" id="m-tools">—</div></div>
+  <div class="card red">    <div class="label">Guardrails Blocked</div><div class="value" id="m-gr">—</div></div>
+  <div class="card blue recovery-ms"><div class="label">Total Recovery</div><div class="value" id="m-recovery">—</div></div>
+</div>
+
+<!-- Chaos panel -->
+<div class="panel chaos" style="margin-bottom:16px">
+  <h2>Chaos Injector</h2>
+  <div class="chaos-buttons">
+    <button class="btn-deploy" onclick="triggerJob()">▶ Trigger Deployment</button>
+    <button class="btn-chaos"  onclick="chaos('rate_limit',    'claude-sonnet-4-6')">Rate Limit Sonnet</button>
+    <button class="btn-chaos"  onclick="chaos('provider_outage','claude-sonnet-4-6')">Outage Sonnet</button>
+    <button class="btn-warn"   onclick="chaos('tool_timeout',  'github_deploy')">Timeout Deploy Tool</button>
+    <button class="btn-chaos"  onclick="chaos('quarantine_tool','github_deploy')">Quarantine Tool</button>
+    <button class="btn-reset"  onclick="chaosReset()">↺ Reset All Chaos</button>
+  </div>
+</div>
+
+<!-- Main content grid -->
+<div class="grid-2">
+  <!-- Live log -->
+  <div class="panel" style="grid-column: 1 / -1;">
+    <h2>Live Agent Log</h2>
+    <div class="log-box" id="live-log"></div>
+  </div>
+</div>
+
+<div class="grid-3">
+  <!-- Jobs -->
+  <div class="panel" style="grid-column: 1 / span 2;">
+    <h2>Recent Jobs</h2>
+    <table>
+      <thead><tr>
+        <th>Job ID</th><th>Status</th><th>Switches</th><th>Tool Fails</th><th>Retries</th><th>Recovery</th><th>Created</th>
+      </tr></thead>
+      <tbody id="jobs-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Side panels -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div class="panel">
+      <h2>Provider Log</h2>
+      <ul class="mini-log" id="provider-log"><li style="color:var(--muted)">Waiting...</li></ul>
+    </div>
+    <div class="panel">
+      <h2>Guardrails Log</h2>
+      <ul class="mini-log" id="guardrails-log"><li style="color:var(--muted)">Waiting...</li></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── SSE live log ────────────────────────────────────────────────────────────
+  const logBox = document.getElementById('live-log');
+  const MAX_LOG_LINES = 200;
+
+  function addLogLine(event) {
+    const line = document.createElement('div');
+    line.className = `log-line ${event.level}`;
+    const ts = new Date(event.ts * 1000).toISOString().slice(11, 23);
+    const jobLabel = event.job_id === 'system' ? '[system]' : `[${event.job_id.slice(0,8)}]`;
+    line.innerHTML = `<span class="ts">${ts}</span><span class="msg">${jobLabel} ${escHtml(event.message)}</span>`;
+    logBox.appendChild(line);
+    // Trim old lines
+    while (logBox.children.length > MAX_LOG_LINES) logBox.removeChild(logBox.firstChild);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  const sse = new EventSource('/api/events');
+  sse.onmessage = e => {
+    try { addLogLine(JSON.parse(e.data)); } catch {}
+  };
+  sse.onerror = () => addLogLine({job_id:'system', level:'warn', message:'SSE disconnected — reconnecting...', ts: Date.now()/1000});
+
+  // ── Metrics polling ─────────────────────────────────────────────────────────
+  async function fetchMetrics() {
+    try {
+      const d = await (await fetch('/api/metrics')).json();
+      document.getElementById('m-done').textContent     = d.done;
+      document.getElementById('m-failed').textContent   = d.failed;
+      document.getElementById('m-inprog').textContent   = d.in_progress;
+      document.getElementById('m-switches').textContent = d.provider_switches;
+      document.getElementById('m-tools').textContent    = d.tool_failures;
+      document.getElementById('m-gr').textContent       = d.guardrails_blocked;
+      document.getElementById('m-recovery').textContent = d.total_recovery_ms > 0
+        ? (d.total_recovery_ms / 1000).toFixed(2) + 's'
+        : '—';
+
+      renderProviderLog(d.recent_providers || []);
+      renderGuardrailsLog(d.recent_guardrails || []);
+    } catch {}
+  }
+
+  function renderProviderLog(entries) {
+    const ul = document.getElementById('provider-log');
+    if (!entries.length) { ul.innerHTML = '<li style="color:var(--muted)">No calls yet</li>'; return; }
+    ul.innerHTML = entries.map(p => `
+      <li>
+        <span>${shortModel(p.model)}</span>
+        <span>
+          ${p.latency_ms ? p.latency_ms + 'ms' : ''}
+          <span class="tag ${p.status}">${p.status}</span>
+        </span>
+      </li>`).join('');
+  }
+
+  function renderGuardrailsLog(entries) {
+    const ul = document.getElementById('guardrails-log');
+    if (!entries.length) { ul.innerHTML = '<li style="color:var(--muted)">No events yet</li>'; return; }
+    ul.innerHTML = entries.map(g => `
+      <li>
+        <span>${g.rule}</span>
+        <span class="tag ${g.action}">${g.action}</span>
+      </li>`).join('');
+  }
+
+  // ── Jobs table polling ──────────────────────────────────────────────────────
+  async function fetchJobs() {
+    try {
+      const jobs = await (await fetch('/api/jobs')).json();
+      const tbody = document.getElementById('jobs-tbody');
+      tbody.innerHTML = jobs.map(j => `
+        <tr>
+          <td style="font-size:.7rem;color:var(--muted)">${j.id.slice(0,8)}</td>
+          <td><span class="pill ${j.status}">${j.status}</span></td>
+          <td>${j.provider_switches ?? 0}</td>
+          <td>${j.tool_failures ?? 0}</td>
+          <td>${j.retry_count ?? 0}</td>
+          <td>${j.total_recovery_ms > 0 ? (j.total_recovery_ms/1000).toFixed(2)+'s' : '—'}</td>
+          <td style="color:var(--muted)">${(j.created_at||'').slice(0,19)}</td>
+        </tr>`).join('');
+    } catch {}
+  }
+
+  // ── Chaos helpers ───────────────────────────────────────────────────────────
+  async function post(url, body={}) {
+    await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  }
+  const triggerJob = () => post('/api/jobs', {service:'payment-service', version:'v2.4.1', target_env:'staging', replicas:3, image:'gcr.io/co/payment:v2.4.1'});
+  const chaos = (type, target) => post(`/api/chaos/${type}`, {target});
+  const chaosReset = () => post('/api/chaos/reset');
+
+  // ── Utilities ───────────────────────────────────────────────────────────────
+  const shortModel = m => m.replace('claude-sonnet-4-6','Sonnet').replace('mistral-large-2407','Mistral').replace('meta-llama-3-1-70b','Llama3.1');
+  const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  fetchMetrics(); fetchJobs();
+  setInterval(() => { fetchMetrics(); fetchJobs(); }, 2000);
+</script>
+</body>
+</html>

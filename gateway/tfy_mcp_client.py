@@ -76,15 +76,19 @@ async def _call_tfy_tool_async(tool_name: str, params: dict) -> dict:
     if tool is None:
         raise ValueError(f"Tool '{tool_name}' not found in TrueFoundry MCP Gateway")
     raw = await tool.arun(params)
-    # Extract text content from LangChain tool response format
+    # LangChain MCP adapter returns list of {type, text, id} dicts
+    # Unwrap to get the actual tool result (same shape as local mock)
     if isinstance(raw, list) and raw and isinstance(raw[0], dict):
         content = raw[0].get("text", str(raw))
         try:
             import json as _json
-            return {"status": "success", "result": _json.loads(content), "source": "tfy_mcp_gateway"}
+            result = _json.loads(content)
+            # Add source tag without nesting (so callers get same shape as local mock)
+            result["_source"] = "tfy_mcp_gateway"
+            return result
         except Exception:
-            return {"status": "success", "result": content, "source": "tfy_mcp_gateway"}
-    return {"status": "success", "result": raw, "source": "tfy_mcp_gateway"}
+            return {"status": "success", "result": content, "_source": "tfy_mcp_gateway"}
+    return {"status": "success", "_source": "tfy_mcp_gateway", "raw": raw}
 
 
 # ── Unified call_tool — routes to TrueFoundry or local mock ──────────────────

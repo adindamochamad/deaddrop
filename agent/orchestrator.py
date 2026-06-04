@@ -40,6 +40,20 @@ def _strip_code_fences(text: str) -> str:
 
     return text.strip()
 
+
+def _sanitize_manifest(text: str) -> str:
+    """
+    Remove redaction markers that break YAML syntax.
+    TrueFoundry guardrail replaces secrets with *** which is a YAML alias char.
+    Replace with the safe string 'REDACTED' before validation.
+    """
+    # *** patterns from TrueFoundry secrets-detection guardrail
+    text = re.sub(r'\*{3,}', 'REDACTED', text)
+    # [REDACTED] from our local guardrail — already valid in YAML strings
+    # but strip if it appears as a bare value that might confuse YAML
+    text = re.sub(r'^\[REDACTED\]\s*$', 'REDACTED', text, flags=re.MULTILINE)
+    return text
+
 def _backoff(attempt: int) -> float:
     """Exponential backoff with full jitter: sleep [0, min(cap, base * 2^attempt)]."""
     ceiling = min(MAX_BACKOFF_S, BASE_BACKOFF_S * (2 ** attempt))
@@ -247,6 +261,8 @@ def _step_generate(job_id: str, job: DeploymentJob, cb_manager):
 
     # Strip markdown code fences that LLMs often add (```yaml ... ```)
     manifest = _strip_code_fences(manifest)
+    # Sanitize redaction markers (*** from TrueFoundry guardrail) that break YAML syntax
+    manifest = _sanitize_manifest(manifest)
 
     _checkpoint.save_checkpoint(job_id, {**checkpoint, "manifest": manifest})
     emit(job_id, "info", f"Manifest generated ({elapsed_ms}ms) — checkpoint saved 💾")

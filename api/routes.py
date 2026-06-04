@@ -77,6 +77,7 @@ def _job_to_dict(job: DeploymentJob) -> dict:
 
 @router.get("/metrics")
 def get_metrics():
+    import os
     session = get_session()
     try:
         jobs = session.query(DeploymentJob).all()
@@ -96,12 +97,18 @@ def get_metrics():
             for p in recent_providers
         ]
 
-        # Recent guardrails log (last 5)
+        # Recent guardrails log (last 5) and total event count
+        total_guardrail_events = session.query(GuardrailsLog).count()
         recent_gr = session.query(GuardrailsLog).order_by(GuardrailsLog.created_at.desc()).limit(5).all()
         guardrails_log = [
             {"rule": g.rule_name, "action": g.action, "detail": g.detail}
             for g in recent_gr
         ]
+
+        # Whether TrueFoundry native guardrails are wired up to LLM calls
+        tfy_guardrails_configured = bool(
+            os.getenv("TFY_GUARDRAIL_INPUT_ID") or os.getenv("TFY_GUARDRAIL_OUTPUT_ID")
+        )
 
         return {
             "total_jobs": total,
@@ -111,6 +118,8 @@ def get_metrics():
             "provider_switches": provider_switches,
             "tool_failures": tool_failures,
             "guardrails_blocked": guardrails_blocked,
+            "total_guardrail_events": total_guardrail_events,
+            "tfy_guardrails_configured": tfy_guardrails_configured,
             "total_recovery_ms": total_recovery_ms,
             "recent_providers": provider_log,
             "recent_guardrails": guardrails_log,
@@ -244,6 +253,24 @@ def run_scenario(req: ScenarioRequest):
     s = SCENARIOS.get(req.scenario)
     if not s:
         raise HTTPException(status_code=404, detail=f"Unknown scenario: {req.scenario}. Available: {list(SCENARIOS)}")
+
+    # Wait until no other jobs are in progress before injecting chaos
+    # Prevents race condition where chaos from this scenario affects other running jobs
+    from db.models import get_session, DeploymentJob as _DJ
+    session = get_session()
+    try:
+        in_progress = session.query(_DJ).filter(
+            _DJ.status.in_(["analyzing", "generating", "validating", "deploying"])
+        ).count()
+    finally:
+        session.close()
+
+    if in_progress > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot start scenario: {in_progress} job(s) still running. "
+                   f"Wait for them to finish or call /api/chaos/reset first.",
+        )
 
     # Reset previous chaos first
     chaos_injector.reset_all()

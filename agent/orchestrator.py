@@ -172,19 +172,7 @@ def _run_step_with_retry(job_id, handler, cb_manager, sm, enter_state, success_s
             _checkpoint.increment_metric(job_id, "guardrails_blocked")
             emit(job_id, "warn", f"Guardrail blocked: {e}")
 
-            # If VALIDATING caught a bad manifest, clear it so the next retry
-            # goes back to GENERATING and regenerates instead of failing again.
-            if enter_state == JobState.VALIDATING:
-                job = _checkpoint.load(job_id)
-                checkpoint = job.checkpoint_data or {}
-                checkpoint.pop("manifest", None)
-                checkpoint.pop("validated", None)
-                _checkpoint.save_checkpoint(job_id, checkpoint)
-                sm.transition(JobState.GENERATING)
-                _checkpoint.transition(job_id, "generating", reason="guardrail blocked — regenerating manifest")
-                emit(job_id, "warn", "↩ Rolling back to GENERATING to regenerate manifest")
-                return True  # let outer loop re-enter at GENERATING
-
+            # Always check MAX_RETRIES first — prevents infinite rollback loops
             job = _checkpoint.load(job_id)
             attempt = job.retry_count if job else attempt + 1
             if attempt >= MAX_RETRIES:
@@ -193,8 +181,20 @@ def _run_step_with_retry(job_id, handler, cb_manager, sm, enter_state, success_s
                 emit(job_id, "error", f"Max retries reached — job FAILED")
                 return False
 
+            # If VALIDATING caught a bad manifest, roll back to GENERATING
+            # so the agent regenerates instead of retrying the same bad manifest.
+            if enter_state == JobState.VALIDATING:
+                checkpoint = job.checkpoint_data or {}
+                checkpoint.pop("manifest", None)
+                checkpoint.pop("validated", None)
+                _checkpoint.save_checkpoint(job_id, checkpoint)
+                sm.transition(JobState.GENERATING)
+                _checkpoint.transition(job_id, "generating", reason="guardrail blocked — regenerating manifest")
+                emit(job_id, "warn", f"↩ Rolling back to GENERATING (attempt {attempt}/{MAX_RETRIES})")
+                return True  # outer loop re-enters at GENERATING
+
             delay = _backoff(attempt)
-            emit(job_id, "warn", f"Retrying in {delay:.1f}s (attempt {attempt+1}/{MAX_RETRIES})")
+            emit(job_id, "warn", f"Retrying in {delay:.1f}s (attempt {attempt}/{MAX_RETRIES})")
             time.sleep(delay)
 
         except Exception as e:

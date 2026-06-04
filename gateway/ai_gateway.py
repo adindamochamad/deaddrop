@@ -237,7 +237,7 @@ def _call_truefoundry(prompt: str, system: str | None, model: str, forced_timeou
         if TFY_GUARDRAIL_OUTPUT_ID:
             extra["output_guardrail_id"] = TFY_GUARDRAIL_OUTPUT_ID
         call_kwargs["extra_body"] = extra
-        logger.debug(f"[AIGateway] TrueFoundry guardrails attached: {extra}")
+        logger.info(f"[AIGateway] TrueFoundry guardrails attached: {extra}")
 
     try:
         resp = client.chat.completions.create(**call_kwargs)

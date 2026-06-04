@@ -25,6 +25,8 @@ _mcp_asgi = _get_mcp_app()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _startup_checks()
+
     # Start background worker
     import worker
     t = threading.Thread(target=worker.run, daemon=True)
@@ -34,6 +36,33 @@ async def lifespan(app: FastAPI):
     # Boot FastMCP's session manager (required for streamable-http transport)
     async with _mcp_asgi.lifespan(app):
         yield
+
+
+def _startup_checks():
+    log = logging.getLogger("main")
+    tfy_key = os.getenv("TRUEFOUNDRY_API_KEY", "")
+    tfy_url = os.getenv("TRUEFOUNDRY_TENANT_URL", "")
+    input_id  = os.getenv("TFY_GUARDRAIL_INPUT_ID", "")
+    output_id = os.getenv("TFY_GUARDRAIL_OUTPUT_ID", "")
+
+    if not tfy_key or not tfy_url:
+        log.warning("TrueFoundry credentials not set — running in stub/local mode (no real LLM calls)")
+
+    if tfy_key and tfy_url:
+        if not input_id and not output_id:
+            log.warning(
+                "TFY_GUARDRAIL_INPUT_ID and TFY_GUARDRAIL_OUTPUT_ID are not set — "
+                "TrueFoundry native guardrails are DISABLED. "
+                "Guardrail metrics in TrueFoundry dashboard will stay at 0. "
+                "Set these IDs from: platform.truefoundry.cloud → AI Gateway → Guardrails"
+            )
+        else:
+            configured = []
+            if input_id:
+                configured.append(f"input={input_id}")
+            if output_id:
+                configured.append(f"output={output_id}")
+            log.info(f"TrueFoundry native guardrails ACTIVE: {', '.join(configured)}")
 
 
 app = FastAPI(

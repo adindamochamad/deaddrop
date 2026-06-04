@@ -245,8 +245,12 @@ deaddrop/
 ├── gateway/
 │   ├── ai_gateway.py         # TrueFoundry AI Gateway client, fallback chain
 │   ├── mcp_gateway.py        # MCP Gateway client, tool health, audit log
-│   ├── guardrails.py         # Redact, validate YAML, production block
+│   ├── mcp_server.py         # FastMCP server — exposes tools at /mcp (registered in TrueFoundry)
+│   ├── tfy_mcp_client.py     # TrueFoundry MCP Gateway client (langchain-mcp-adapters)
+│   ├── guardrails.py         # Local guardrail layer: redact, validate YAML, inspect tool results
 │   └── permissions.py        # Scoped permissions per tool
+├── api/
+│   ├── guardrail_routes.py   # TrueFoundry-compatible guardrail HTTP endpoints (/guardrail/*)
 ├── tools/
 │   ├── github_deploy.py      # Deploy tool (mock: writes locally)
 │   ├── validator.py          # YAML/JSON manifest validation
@@ -275,8 +279,8 @@ deaddrop/
 | Criteria | Implementation |
 |---|---|
 | **AI Gateway** | 3-provider routing chain, per-provider circuit breakers, latency + token tracking, provider switch counter |
-| **MCP Gateway** | 3 tools registered, `permissions.py` scoped per env, audit log in MySQL, tool quarantine + fallback |
-| **Guardrails** | API key redaction (regex), production deploy block (without `approved` flag), YAML validation pre-tool |
+| **MCP Gateway** | 3 tools live at `gateway.truefoundry.ai/adindamochamad/mcp/deaddrop-mcp/server`, scoped permissions, Bearer auth, audit log in MySQL, tool quarantine + fallback |
+| **Guardrails** | TrueFoundry native: Secrets Detection (MUTATE), Prompt Injection (VALIDATE), PII/PHI (MUTATE) — applied to all LLM input/output. Local layer: YAML validation pre-tool, tool result inspection, production deploy block |
 | **Resilience** | 6 failure modes covered, state checkpoints, exponential backoff, graceful degradation |
 | **Usefulness** | Backend engineer deploying at 2am — concrete, real scenario |
 | **Demo clarity** | One-click scenarios, SSE live log, resilience chain summary per job |
@@ -285,16 +289,42 @@ deaddrop/
 
 ## TrueFoundry Setup
 
-**Tenant URL:** `https://gateway.truefoundry.ai`
+**Tenant:** `adindamochamad.truefoundry.cloud`
+**AI Gateway URL:** `https://gateway.truefoundry.ai`
 
-**AI Gateway — Provider chain:**
-- Primary: `aws-bedrock1/global.anthropic.claude-sonnet-4-6`
-- Fallback 1: `aws-bedrock1/mistral.mistral-large-3-675b-instruct`
-- Fallback 2: `aws-bedrock1/us.meta.llama3-1-70b-instruct-v1-0`
+### AI Gateway — Provider chain (AWS Bedrock)
+| Priority | Model | Role |
+|---|---|---|
+| 1 (Primary) | `aws-bedrock1/global.anthropic.claude-sonnet-4-6` | Claude Sonnet 4.6 |
+| 2 (Fallback) | `aws-bedrock1/mistral.mistral-large-3-675b-instruct` | Mistral Large |
+| 3 (Fallback) | `aws-bedrock1/us.meta.llama3-1-70b-instruct-v1-0` | Llama 3.1 70B |
 
-**MCP Gateway — Tools:** `github_deploy`, `validator`, `notifier`
+Each provider has an independent circuit breaker (threshold: 3 failures, recovery: 30s).
 
-**Guardrails:** Secret redaction, production environment block, YAML/JSON validation
+### MCP Gateway — 3 tools live
+**Gateway URL:** `https://gateway.truefoundry.ai/adindamochamad/mcp/deaddrop-mcp/server`
+
+| Tool | Description | Auth |
+|---|---|---|
+| `validator` | Validates Kubernetes manifests (YAML/JSON) | Bearer token |
+| `github_deploy` | Deploys config to target environment | Bearer token + env approval |
+| `notifier` | Sends deployment alerts | Bearer token |
+
+MCP Server exposed at: `https://deaddrop.adindamochamad.com/mcp`
+
+### Guardrails — native TrueFoundry (group: `deaddrop-guardrails`)
+| Guardrail | Mode | Scope | What it does |
+|---|---|---|---|
+| `secrets-detection` | MUTATE | LLM Input + Output | Redacts AWS keys, API keys, JWT tokens → `[REDACTED]` |
+| `prompt-injection` | VALIDATE | LLM Input | Blocks jailbreak and injection attempts |
+| `pii-phi-detection` | MUTATE | LLM Input + Output | Masks SSN, credit cards, email addresses |
+
+Policy `guardrails-config` applies to all LLM calls automatically.
+
+**Additional local guardrail layer:**
+- YAML/JSON syntax validation before every tool call
+- Tool result inspection (prompt injection detection in tool output)
+- Production environment block (requires `approved=true`)
 
 ---
 

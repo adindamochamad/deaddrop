@@ -21,11 +21,18 @@ SCENARIOS = {
         "description": "Sub-scene A: trigger deployment, all providers healthy",
         "chaos": [],
     },
+    "slow_response": {
+        "name": "Slow provider → timeout → fallback",
+        "description": "Claude Sonnet hangs (forced timeout 0.5s) → TimeoutError → fallback to Mistral",
+        "chaos": [
+            {"type": "slow_response", "target": "aws-bedrock1/global.anthropic.claude-sonnet-4-6"},
+        ],
+    },
     "rate_limit": {
         "name": "Provider rate limit",
         "description": "Sub-scene B: Claude Sonnet hits rate limit → fallback to Mistral",
         "chaos": [
-            {"type": "rate_limit", "target": "claude-sonnet-4-6"},
+            {"type": "rate_limit", "target": "aws-bedrock1/global.anthropic.claude-sonnet-4-6"},
         ],
     },
     "tool_timeout": {
@@ -39,7 +46,7 @@ SCENARIOS = {
         "name": "Full chaos",
         "description": "All failures at once: provider outage + tool quarantine + bad output",
         "chaos": [
-            {"type": "provider_outage", "target": "claude-sonnet-4-6"},
+            {"type": "provider_outage", "target": "aws-bedrock1/global.anthropic.claude-sonnet-4-6"},
             {"type": "quarantine_tool", "target": "github_deploy"},
             {"type": "bad_output"},
         ],

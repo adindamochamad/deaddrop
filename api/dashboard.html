@@ -102,17 +102,29 @@
   <div class="card blue recovery-ms"><div class="label">Total Recovery</div><div class="value" id="m-recovery">—</div></div>
 </div>
 
-<!-- Chaos panel -->
+<!-- Demo scenario panel -->
 <div class="panel chaos" style="margin-bottom:16px">
-  <h2>Chaos Injector</h2>
-  <div class="chaos-buttons">
-    <button class="btn-deploy" onclick="triggerJob()">▶ Trigger Deployment</button>
-    <button class="btn-chaos"  onclick="chaos('rate_limit',    'claude-sonnet-4-6')">Rate Limit Sonnet</button>
-    <button class="btn-chaos"  onclick="chaos('provider_outage','claude-sonnet-4-6')">Outage Sonnet</button>
-    <button class="btn-warn"   onclick="chaos('tool_timeout',  'github_deploy')">Timeout Deploy Tool</button>
-    <button class="btn-chaos"  onclick="chaos('quarantine_tool','github_deploy')">Quarantine Tool</button>
+  <h2>Demo Scenarios</h2>
+  <div class="chaos-buttons" style="margin-bottom:12px">
+    <button class="btn-deploy" onclick="runScenario('normal')">▶ A: Normal Deploy</button>
+    <button class="btn-chaos"  onclick="runScenario('rate_limit')">▶ B: Rate Limit → Fallback</button>
+    <button class="btn-warn"   onclick="runScenario('slow_response')">▶ B2: Slow Response → Timeout</button>
+    <button class="btn-warn"   onclick="runScenario('tool_timeout')">▶ C: Tool Timeout → Fallback</button>
+    <button class="btn-chaos"  onclick="runScenario('full_chaos')">▶ D: Full Chaos (Cascading)</button>
     <button class="btn-reset"  onclick="chaosReset()">↺ Reset All Chaos</button>
   </div>
+  <details style="margin-top:6px">
+    <summary style="color:var(--muted);font-size:0.72rem;cursor:pointer">Manual chaos controls</summary>
+    <div class="chaos-buttons" style="margin-top:8px">
+      <button class="btn-deploy" onclick="triggerJob()">Trigger Job Only</button>
+      <button class="btn-chaos"  onclick="chaos('rate_limit',     'aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Rate Limit Sonnet</button>
+      <button class="btn-chaos"  onclick="chaos('provider_outage','aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Outage Sonnet</button>
+      <button class="btn-warn"   onclick="chaos('slow_response',  'aws-bedrock1/global.anthropic.claude-sonnet-4-6')">Slow Response Sonnet</button>
+      <button class="btn-warn"   onclick="chaos('tool_timeout',   'github_deploy')">Timeout Deploy Tool</button>
+      <button class="btn-chaos"  onclick="chaos('quarantine_tool','github_deploy')">Quarantine Tool</button>
+      <button class="btn-warn"   onclick="post('/api/chaos/bad_output')">Bad LLM Output</button>
+    </div>
+  </details>
 </div>
 
 <!-- Main content grid -->
@@ -239,9 +251,15 @@
   const triggerJob = () => post('/api/jobs', {service:'payment-service', version:'v2.4.1', target_env:'staging', replicas:3, image:'gcr.io/co/payment:v2.4.1'});
   const chaos = (type, target) => post(`/api/chaos/${type}`, {target});
   const chaosReset = () => post('/api/chaos/reset');
+  const runScenario = (name) => post('/api/scenario', {scenario: name});
 
   // ── Utilities ───────────────────────────────────────────────────────────────
-  const shortModel = m => m.replace('claude-sonnet-4-6','Sonnet').replace('mistral-large-2407','Mistral').replace('meta-llama-3-1-70b','Llama3.1');
+  const shortModel = m => {
+    if (m.includes('claude-sonnet'))   return 'Claude Sonnet';
+    if (m.includes('mistral'))         return 'Mistral Large';
+    if (m.includes('llama'))           return 'Llama 3.1 70B';
+    return m;
+  };
   const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // ── Boot ────────────────────────────────────────────────────────────────────

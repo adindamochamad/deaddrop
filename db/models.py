@@ -79,17 +79,22 @@ class ProviderLog(Base):
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
 
 
+_engine = None
+
+
 def get_engine():
-    host = os.getenv("MYSQL_HOST", "localhost")
-    port = os.getenv("MYSQL_PORT", "3306")
-    db = os.getenv("MYSQL_DB", "deaddrop")
-    user = os.getenv("MYSQL_USER", "deaddrop")
-    password = os.getenv("MYSQL_PASSWORD", "")
-    url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
-    return create_engine(url, echo=False)
+    global _engine
+    if _engine is None:
+        host = os.getenv("MYSQL_HOST", "localhost")
+        port = os.getenv("MYSQL_PORT", "3306")
+        db = os.getenv("MYSQL_DB", "deaddrop")
+        user = os.getenv("MYSQL_USER", "deaddrop")
+        password = os.getenv("MYSQL_PASSWORD", "")
+        url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
+        _engine = create_engine(url, echo=False, pool_size=10, max_overflow=20, pool_recycle=3600)
+    return _engine
 
 
 def get_session():
-    engine = get_engine()
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=get_engine())
     return Session()

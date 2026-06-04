@@ -164,7 +164,7 @@ def _require_demo_mode():
 @router.post("/chaos/rate_limit")
 def chaos_rate_limit(req: ChaosRequest):
     _require_demo_mode()
-    target = req.target or "claude-sonnet-4-6"
+    target = req.target or "aws-bedrock1/global.anthropic.claude-sonnet-4-6"
     chaos_injector.inject_rate_limit(target)
     from agent.events import emit
     emit("system", "warn", f"[CHAOS] Rate limit injected: {target}")
@@ -184,7 +184,7 @@ def chaos_tool_timeout(req: ChaosRequest):
 @router.post("/chaos/provider_outage")
 def chaos_outage(req: ChaosRequest):
     _require_demo_mode()
-    target = req.target or "claude-sonnet-4-6"
+    target = req.target or "aws-bedrock1/global.anthropic.claude-sonnet-4-6"
     chaos_injector.inject_provider_outage(target)
     from agent.events import emit
     emit("system", "warn", f"[CHAOS] Provider outage injected: {target}")
@@ -201,6 +201,25 @@ def chaos_quarantine(req: ChaosRequest):
     return {"injected": "quarantine_tool", "target": target}
 
 
+@router.post("/chaos/slow_response")
+def chaos_slow_response(req: ChaosRequest):
+    _require_demo_mode()
+    target = req.target or "aws-bedrock1/global.anthropic.claude-sonnet-4-6"
+    chaos_injector.inject_slow_response(target)
+    from agent.events import emit
+    emit("system", "warn", f"[CHAOS] Slow response injected: {target} (forced timeout=0.5s)")
+    return {"injected": "slow_response", "target": target}
+
+
+@router.post("/chaos/bad_output")
+def chaos_bad_output():
+    _require_demo_mode()
+    chaos_injector.inject_bad_output()
+    from agent.events import emit
+    emit("system", "warn", "[CHAOS] Bad LLM output injection active (next generate call returns invalid YAML)")
+    return {"injected": "bad_output"}
+
+
 @router.post("/chaos/reset")
 def chaos_reset():
     _require_demo_mode()
@@ -208,3 +227,44 @@ def chaos_reset():
     from agent.events import emit
     emit("system", "success", "[CHAOS] All chaos cleared — normal operation restored")
     return {"status": "cleared"}
+
+
+# ── Scenario shortcut (triggers chaos + job in one call) ──────────────────────
+
+class ScenarioRequest(BaseModel):
+    scenario: str = "normal"
+
+
+@router.post("/scenario")
+def run_scenario(req: ScenarioRequest):
+    _require_demo_mode()
+    from demo.scenarios import SCENARIOS, DEMO_JOB_INPUT
+    from agent.events import emit
+
+    s = SCENARIOS.get(req.scenario)
+    if not s:
+        raise HTTPException(status_code=404, detail=f"Unknown scenario: {req.scenario}. Available: {list(SCENARIOS)}")
+
+    # Reset previous chaos first
+    chaos_injector.reset_all()
+
+    # Apply this scenario's chaos
+    for c in s["chaos"]:
+        t = c.get("type")
+        target = c.get("target", "")
+        if t == "rate_limit":
+            chaos_injector.inject_rate_limit(target)
+        elif t == "slow_response":
+            chaos_injector.inject_slow_response(target)
+        elif t == "tool_timeout":
+            chaos_injector.inject_timeout(target)
+        elif t == "bad_output":
+            chaos_injector.inject_bad_output()
+        elif t == "provider_outage":
+            chaos_injector.inject_provider_outage(target)
+        elif t == "quarantine_tool":
+            chaos_injector.quarantine_tool(target)
+
+    emit("system", "info", f"[SCENARIO] {s['name']} — {s['description']}")
+    job_id = create_job(DEMO_JOB_INPUT)
+    return {"scenario": req.scenario, "job_id": job_id, "chaos": s["chaos"]}

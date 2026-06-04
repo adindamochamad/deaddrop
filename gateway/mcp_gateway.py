@@ -68,13 +68,16 @@ def call_tool(tool_name: str, params: dict, job_id: str | None = None) -> dict:
             _audit(job_id, tool_name, params, None, reason, 0)
             if job_id:
                 emit(job_id, "warn", f"⚡ {tool_name} {reason} → degrading to {fallback}")
-            # graceful degradation: log-only notification instead of actual deploy
-            return call_tool(fallback, {
+            result = call_tool(fallback, {
                 **params,
                 "event": f"{tool_name}_degraded",
                 "message": f"{tool_name} unavailable ({reason}) — using fallback {fallback}",
                 "severity": "warn",
             }, job_id=job_id)
+            # Mark that a tool failure occurred (primary unavailable) even though fallback succeeded
+            result["_fallback_used"] = True
+            result["_failed_tool"] = tool_name
+            return result
 
         reason = "quarantined" if tool_name in _quarantined_tools else "timeout"
         _audit(job_id, tool_name, params, None, reason, 0)

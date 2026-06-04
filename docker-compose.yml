@@ -10,7 +10,7 @@ services:
       MYSQL_USER: deaddrop
       MYSQL_PASSWORD: deaddroppass
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
@@ -24,7 +24,7 @@ services:
     build: .
     container_name: deaddrop-api
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - .env
     environment:

@@ -110,10 +110,27 @@ def process_job(job_id: str):
         job = _checkpoint.load(job_id)
 
     final = _checkpoint.load(job_id)
+    status = final.status if final else "unknown"
+
+    if final and status == "done":
+        parts = []
+        if (final.provider_switches or 0) > 0:
+            parts.append(f"{final.provider_switches} provider switch(es)")
+        if (final.tool_failures or 0) > 0:
+            parts.append(f"{final.tool_failures} tool failure(s) handled")
+        if (final.guardrails_blocked or 0) > 0:
+            parts.append(f"{final.guardrails_blocked} guardrail block(s)")
+        recovery_s = (final.total_recovery_ms or 0) / 1000
+        if recovery_s > 0:
+            parts.append(f"recovered in {recovery_s:.2f}s")
+
+        if parts:
+            emit(job_id, "success", f"Resilience chain: {' | '.join(parts)}")
+
     emit(
         job_id,
-        "success" if final and final.status == "done" else "error",
-        f"Job {job_id[:8]} finished — {final.status.upper() if final else 'UNKNOWN'}"
+        "success" if status == "done" else "error",
+        f"{'✅' if status == 'done' else '❌'} Job {job_id[:8]} — {status.upper()}"
     )
 
 
@@ -139,6 +156,19 @@ def _run_step_with_retry(job_id, handler, cb_manager, sm, enter_state, success_s
             _checkpoint.record_error(job_id, str(e))
             _checkpoint.increment_metric(job_id, "guardrails_blocked")
             emit(job_id, "warn", f"Guardrail blocked: {e}")
+
+            # If VALIDATING caught a bad manifest, clear it so the next retry
+            # goes back to GENERATING and regenerates instead of failing again.
+            if enter_state == JobState.VALIDATING:
+                job = _checkpoint.load(job_id)
+                checkpoint = job.checkpoint_data or {}
+                checkpoint.pop("manifest", None)
+                checkpoint.pop("validated", None)
+                _checkpoint.save_checkpoint(job_id, checkpoint)
+                sm.transition(JobState.GENERATING)
+                _checkpoint.transition(job_id, "generating", reason="guardrail blocked — regenerating manifest")
+                emit(job_id, "warn", "↩ Rolling back to GENERATING to regenerate manifest")
+                return True  # let outer loop re-enter at GENERATING
 
             job = _checkpoint.load(job_id)
             attempt = job.retry_count if job else attempt + 1
@@ -189,7 +219,7 @@ def _step_analyze(job_id: str, job: DeploymentJob, cb_manager):
     # Merge into existing checkpoint so resume doesn't lose prior data
     checkpoint = job.checkpoint_data or {}
     _checkpoint.save_checkpoint(job_id, {**checkpoint, "analysis": analysis})
-    emit(job_id, "info", f"Analysis done ({elapsed_ms}ms)")
+    emit(job_id, "info", f"Analysis done ({elapsed_ms}ms) — checkpoint saved 💾")
 
 
 def _step_generate(job_id: str, job: DeploymentJob, cb_manager):
@@ -218,7 +248,7 @@ def _step_generate(job_id: str, job: DeploymentJob, cb_manager):
     manifest = _strip_code_fences(manifest)
 
     _checkpoint.save_checkpoint(job_id, {**checkpoint, "manifest": manifest})
-    emit(job_id, "info", f"Manifest generated ({elapsed_ms}ms)")
+    emit(job_id, "info", f"Manifest generated ({elapsed_ms}ms) — checkpoint saved 💾")
 
 
 def _step_validate(job_id: str, job: DeploymentJob, cb_manager):
@@ -258,6 +288,8 @@ def _step_deploy(job_id: str, job: DeploymentJob, cb_manager):
     try:
         result = call_tool("github_deploy", args, job_id=job_id)
         elapsed_ms = int((time.time() - t0) * 1000)
+        if result.get("_fallback_used"):
+            _checkpoint.increment_metric(job_id, "tool_failures")
     except (ToolQuarantinedError, ToolTimeoutError) as e:
         _checkpoint.increment_metric(job_id, "tool_failures")
         raise
@@ -270,7 +302,7 @@ def _step_deploy(job_id: str, job: DeploymentJob, cb_manager):
         call_tool("notifier", {
             "job_id": job_id,
             "event": "deployment_success",
-            "message": f"Deployed {result.get('commit_sha')} → {result.get('target_env')}",
+            "message": f"Deployed {result.get('commit_sha', '(fallback)')} → {result.get('target_env', input_data.get('target_env', 'staging'))}",
             "severity": "info",
         }, job_id=job_id)
     except Exception as e:

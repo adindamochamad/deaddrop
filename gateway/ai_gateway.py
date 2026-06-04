@@ -36,6 +36,7 @@ def _get_client():
 # Chaos injection — set by chaos_injector
 _rate_limited_models: set[str] = set()
 _unavailable_models:  set[str] = set()
+_slow_models: dict[str, float] = {}   # model → forced timeout seconds
 
 
 def inject_rate_limit(model: str):
@@ -48,9 +49,16 @@ def inject_outage(model: str):
     logger.warning(f"[ChaosInjector] Outage injected: {model}")
 
 
+def inject_slow_response(model: str, timeout_secs: float = 0.5):
+    """Force the provider to time out by using a near-zero HTTP timeout."""
+    _slow_models[model] = timeout_secs
+    logger.warning(f"[ChaosInjector] Slow response injected: {model} (timeout={timeout_secs}s)")
+
+
 def reset_provider_chaos():
     _rate_limited_models.clear()
     _unavailable_models.clear()
+    _slow_models.clear()
     logger.info("[ChaosInjector] Provider chaos cleared")
 
 
@@ -114,7 +122,8 @@ def call_llm(
         if model in _unavailable_models:
             logger.warning(f"[AIGateway] {label} UNAVAILABLE (injected)")
             if job_id:
-                emit(job_id, "warn", f"✗ {label} provider unavailable")
+                emit(job_id, "warn", f"✗ {label} provider unavailable → switching")
+                _record_provider_switch(job_id)
             cb_manager.record_failure(model)
             _log_provider(job_id, config, "error", 0, 0)
             if failure_detected_at is None:
@@ -132,10 +141,16 @@ def call_llm(
                 failure_detected_at = time.time()
             continue
 
+        # Slow-response chaos: emit warning before the call, then let it timeout
+        if model in _slow_models:
+            if job_id:
+                emit(job_id, "warn", f"⌛ {label} responding slowly — waiting for timeout...")
+
         # Attempt the call
         try:
             start = time.time()
-            text, tokens = _call_truefoundry(prompt, system, model)
+            forced_timeout = _slow_models.get(model)
+            text, tokens = _call_truefoundry(prompt, system, model, forced_timeout=forced_timeout)
             latency_ms = int((time.time() - start) * 1000)
 
             recovery_ms = int((time.time() - failure_detected_at) * 1000) if failure_detected_at else 0
@@ -186,7 +201,7 @@ def call_llm(
     raise Exception(f"All LLM providers exhausted. Last: {last_error}")
 
 
-def _call_truefoundry(prompt: str, system: str | None, model: str) -> tuple[str, int]:
+def _call_truefoundry(prompt: str, system: str | None, model: str, forced_timeout: float | None = None) -> tuple[str, int]:
     if not TRUEFOUNDRY_API_KEY or not TRUEFOUNDRY_TENANT_URL:
         logger.debug(f"[AIGateway] No credentials — stub response for {model}")
         return (
@@ -203,8 +218,13 @@ def _call_truefoundry(prompt: str, system: str | None, model: str) -> tuple[str,
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
+    # forced_timeout < real latency → guaranteed APITimeoutError (simulates slow provider)
+    call_kwargs = {"model": model, "messages": messages}
+    if forced_timeout is not None:
+        call_kwargs["timeout"] = forced_timeout
+
     try:
-        resp = client.chat.completions.create(model=model, messages=messages)
+        resp = client.chat.completions.create(**call_kwargs)
     except OAIRateLimitError:
         raise RateLimitError(f"429 from {model}")
     except APITimeoutError:

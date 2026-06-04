@@ -19,14 +19,21 @@ logging.basicConfig(
 _DASHBOARD = Path(__file__).parent / "dashboard.html"
 
 
+from gateway.mcp_server import get_mcp_app as _get_mcp_app
+_mcp_asgi = _get_mcp_app()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Auto-start worker on startup so stalled jobs are picked up after crash/restart
+    # Start background worker
     import worker
     t = threading.Thread(target=worker.run, daemon=True)
     t.start()
     logging.getLogger("main").info("Worker started")
-    yield
+
+    # Boot FastMCP's session manager (required for streamable-http transport)
+    async with _mcp_asgi.lifespan(app):
+        yield
 
 
 app = FastAPI(
@@ -44,6 +51,11 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+
+# ── Mount TrueFoundry MCP Server at /mcp ──────────────────────────────────────
+# TrueFoundry MCP Gateway registers: https://deaddrop.adindamochamad.com/mcp
+# Transport: streamable-http  Auth: Bearer <MCP_SERVER_SECRET>
+app.mount("/mcp", _mcp_asgi)
 
 
 @app.get("/", response_class=HTMLResponse)

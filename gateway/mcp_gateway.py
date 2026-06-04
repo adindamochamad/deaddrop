@@ -1,9 +1,24 @@
+import os
 import time
 import logging
 from db.models import get_session, ToolAuditLog
 from gateway.permissions import check_permission, PermissionDeniedError
 
 logger = logging.getLogger(__name__)
+
+# Auth token for MCP tool calls — callers must present this header
+# Uses TRUEFOUNDRY_API_KEY if set, else a local shared secret
+_MCP_AUTH_TOKEN = os.getenv("TRUEFOUNDRY_API_KEY") or os.getenv("MCP_AUTH_TOKEN", "")
+
+
+def verify_mcp_auth(token: str | None) -> bool:
+    """
+    Verify the bearer token for internal MCP Gateway auth.
+    In production this would validate against TrueFoundry's auth service.
+    """
+    if not _MCP_AUTH_TOKEN:
+        return True  # no auth configured → allow (dev mode)
+    return token == _MCP_AUTH_TOKEN
 
 # ── Chaos injection state ──────────────────────────────────────────────────────
 _quarantined_tools: set[str] = set()
@@ -43,13 +58,22 @@ def check_tool_health(tool_name: str) -> bool:
     return True
 
 
-def call_tool(tool_name: str, params: dict, job_id: str | None = None) -> dict:
+def call_tool(tool_name: str, params: dict, job_id: str | None = None,
+              auth_token: str | None = None) -> dict:
     """
     Execute a registered MCP tool.
-    Order: permission check → health check → dispatch → audit log.
+    Order: auth check → permission check → health check → dispatch → audit log.
     Falls back to alternate tool if primary is unavailable.
     """
     from agent.events import emit
+
+    # 0. Auth check — token must match TRUEFOUNDRY_API_KEY
+    # Internal calls pass None (trusted) ; external API calls supply the token
+    if auth_token is not None and not verify_mcp_auth(auth_token):
+        _audit(job_id, tool_name, params, None, "error", 0)
+        if job_id:
+            emit(job_id, "error", f"🔑 MCP auth failed for {tool_name}")
+        raise PermissionDeniedError(f"Invalid auth token for MCP tool '{tool_name}'")
 
     # 1. Scope / permission check (explicit judging criterion)
     try:

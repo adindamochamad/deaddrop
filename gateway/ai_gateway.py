@@ -16,8 +16,13 @@ PROVIDER_CHAIN = [
     {"provider": "aws-bedrock", "model": "aws-bedrock1/us.meta.llama3-1-70b-instruct-v1-0",      "priority": 3, "label": "Llama 3.1 70B"},
 ]
 
-TRUEFOUNDRY_API_KEY  = os.getenv("TRUEFOUNDRY_API_KEY", "")
+TRUEFOUNDRY_API_KEY    = os.getenv("TRUEFOUNDRY_API_KEY", "")
 TRUEFOUNDRY_TENANT_URL = os.getenv("TRUEFOUNDRY_TENANT_URL", "")
+
+# TrueFoundry native Guardrails IDs (configure in TrueFoundry dashboard)
+# When set, guardrail checks run server-side at the AI Gateway level
+TFY_GUARDRAIL_INPUT_ID  = os.getenv("TFY_GUARDRAIL_INPUT_ID", "")
+TFY_GUARDRAIL_OUTPUT_ID = os.getenv("TFY_GUARDRAIL_OUTPUT_ID", "")
 
 # Module-level client — reuses connection pool across all calls
 _openai_client = None
@@ -219,9 +224,20 @@ def _call_truefoundry(prompt: str, system: str | None, model: str, forced_timeou
     messages.append({"role": "user", "content": prompt})
 
     # forced_timeout < real latency → guaranteed APITimeoutError (simulates slow provider)
-    call_kwargs = {"model": model, "messages": messages}
+    call_kwargs: dict = {"model": model, "messages": messages}
     if forced_timeout is not None:
         call_kwargs["timeout"] = forced_timeout
+
+    # Attach TrueFoundry native Guardrails IDs when configured
+    # These run server-side at the AI Gateway level (redact, block, validate)
+    if TFY_GUARDRAIL_INPUT_ID or TFY_GUARDRAIL_OUTPUT_ID:
+        extra: dict = {}
+        if TFY_GUARDRAIL_INPUT_ID:
+            extra["input_guardrail_id"] = TFY_GUARDRAIL_INPUT_ID
+        if TFY_GUARDRAIL_OUTPUT_ID:
+            extra["output_guardrail_id"] = TFY_GUARDRAIL_OUTPUT_ID
+        call_kwargs["extra_body"] = extra
+        logger.debug(f"[AIGateway] TrueFoundry guardrails attached: {extra}")
 
     try:
         resp = client.chat.completions.create(**call_kwargs)

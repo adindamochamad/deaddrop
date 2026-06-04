@@ -8,8 +8,9 @@ from datetime import datetime
 from db.models import get_session, DeploymentJob
 from agent.state_machine import StateMachine, JobState
 from agent.checkpoint import CheckpointManager
-from gateway.mcp_gateway import call_tool, ToolQuarantinedError, ToolTimeoutError
-from gateway.guardrails import process_input, process_output, validate_tool_args, GuardrailBlockedError
+from gateway.mcp_gateway import ToolQuarantinedError, ToolTimeoutError
+from gateway.tfy_mcp_client import call_tool_unified as call_tool
+from gateway.guardrails import process_input, process_output, validate_tool_args, inspect_tool_result, GuardrailBlockedError
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,7 @@ def _step_validate(job_id: str, job: DeploymentJob, cb_manager):
     args = validate_tool_args("validator", {"content": manifest, "format": "yaml"}, job_id=job_id)
     emit(job_id, "info", "Running validator tool...")
     result = call_tool("validator", args, job_id=job_id)
+    result = inspect_tool_result("validator", result, job_id=job_id)
 
     if not result.get("valid"):
         raise ValueError(f"Manifest validation failed: {result.get('error')}")
@@ -288,6 +290,7 @@ def _step_deploy(job_id: str, job: DeploymentJob, cb_manager):
     try:
         result = call_tool("github_deploy", args, job_id=job_id)
         elapsed_ms = int((time.time() - t0) * 1000)
+        result = inspect_tool_result("github_deploy", result, job_id=job_id)
         if result.get("_fallback_used"):
             _checkpoint.increment_metric(job_id, "tool_failures")
     except (ToolQuarantinedError, ToolTimeoutError) as e:

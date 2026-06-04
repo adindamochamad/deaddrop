@@ -3,39 +3,135 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { COLORS } from "../constants";
 
 const LAYERS = [
-  { label: "DeadDrop Agent", sub: "State Machine · Circuit Breaker · Checkpoints", color: COLORS.blue,   delay: 0  },
-  { label: "AI Gateway",     sub: "Claude Sonnet → Mistral Large → Llama 3.1",     color: COLORS.green,  delay: 8  },
-  { label: "MCP Gateway",    sub: "github_deploy · validator · notifier",           color: COLORS.orange, delay: 16 },
-  { label: "Guardrails",     sub: "Redact secrets · Block prod · Validate YAML",    color: COLORS.red,    delay: 24 },
-  { label: "AWS Bedrock",    sub: "Primary LLM provider",                           color: COLORS.muted,  delay: 32 },
-];
+  {
+    icon: "⬡",
+    label: "DeadDrop Agent",
+    sub:   "State Machine  ·  Circuit Breaker  ·  Checkpoints",
+    color: COLORS.blue,
+    delay: 20,
+  },
+  {
+    icon: "⚡",
+    label: "TrueFoundry AI Gateway",
+    sub:   "Claude Sonnet 4.6  →  Mistral Large  →  Llama 3.1",
+    color: COLORS.cyan,
+    delay: 55,
+  },
+  {
+    icon: "⚙",
+    label: "TrueFoundry MCP Gateway",
+    sub:   "github_deploy  ·  validator  ·  notifier  ·  graceful degradation",
+    color: COLORS.purple,
+    delay: 90,
+  },
+  {
+    icon: "🛡",
+    label: "Native Guardrails",
+    sub:   "Redact secrets  ·  Block prod deploy  ·  Validate YAML",
+    color: COLORS.amber,
+    delay: 125,
+  },
+  {
+    icon: "☁",
+    label: "AWS Bedrock  +  Infrastructure",
+    sub:   "Primary LLM provider  ·  GitHub  ·  Kubernetes",
+    color: COLORS.muted,
+    delay: 160,
+  },
+] as const;
 
 export const ArchitectureScene: React.FC = () => {
   const frame = useCurrentFrame();
-  const fadeIn = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: "clamp" });
+  const titleOp = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: "clamp" });
 
   return (
-    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", padding: 80, opacity: fadeIn }}>
-      <div style={{ width: 860 }}>
-        <h2 style={{ color: COLORS.muted, fontSize: 18, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 24, textAlign: "center" }}>
-          Architecture
-        </h2>
-        {LAYERS.map(layer => {
-          const slideIn = interpolate(frame - layer.delay, [0, 20], [-40, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-          const opacity = interpolate(frame - layer.delay, [0, 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+    <AbsoluteFill
+      style={{
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "60px 110px",
+        background: COLORS.bg,
+      }}
+    >
+      {/* Dot grid */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        backgroundImage: "radial-gradient(circle, #ffffff07 1px, transparent 1px)",
+        backgroundSize: "28px 28px",
+      }} />
+
+      <div style={{ width: 880, zIndex: 1, opacity: titleOp }}>
+        <p style={{
+          color: COLORS.muted,
+          fontSize: 12,
+          letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          textAlign: "center",
+          marginBottom: 30,
+          fontFamily: "system-ui, sans-serif",
+        }}>
+          Resilience Architecture
+        </p>
+
+        {LAYERS.map((layer) => {
+          const progress = interpolate(frame - layer.delay, [0, 22], [0, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          });
+          const x = interpolate(progress, [0, 1], [-55, 0]);
+
+          // Initial flash glow fades to resting glow
+          const age = frame - layer.delay;
+          const glow = age < 35
+            ? interpolate(age, [0, 14, 35], [0, 1, 0.3])
+            : 0.3;
+
           return (
-            <div key={layer.label} style={{
-              background: COLORS.surface,
-              border: `1px solid ${layer.color}44`,
-              borderLeft: `4px solid ${layer.color}`,
-              borderRadius: 8,
-              padding: "14px 20px",
-              marginBottom: 10,
-              transform: `translateX(${slideIn}px)`,
-              opacity,
-            }}>
-              <span style={{ color: layer.color, fontWeight: 700, fontSize: 18 }}>{layer.label}</span>
-              <span style={{ color: COLORS.muted, fontSize: 15, marginLeft: 12 }}>{layer.sub}</span>
+            <div
+              key={layer.label}
+              style={{
+                background: `${layer.color}08`,
+                border: `1px solid ${layer.color}${hexAlpha(20 + glow * 70)}`,
+                borderLeft: `3px solid ${layer.color}`,
+                borderRadius: 8,
+                padding: "15px 22px",
+                marginBottom: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 18,
+                transform: `translateX(${x}px)`,
+                opacity: progress,
+                boxShadow: `0 0 ${22 * glow}px ${layer.color}${hexAlpha(glow * 55)}`,
+                transition: "box-shadow 0.1s",
+              }}
+            >
+              <span style={{
+                fontSize: 24,
+                filter: `drop-shadow(0 0 5px ${layer.color})`,
+                minWidth: 28,
+                textAlign: "center",
+              }}>
+                {layer.icon}
+              </span>
+              <div>
+                <span style={{
+                  color: layer.color,
+                  fontWeight: 700,
+                  fontSize: 19,
+                  fontFamily: "system-ui, sans-serif",
+                  textShadow: `0 0 8px ${layer.color}88`,
+                }}>
+                  {layer.label}
+                </span>
+                <span style={{
+                  color: COLORS.muted,
+                  fontSize: 14,
+                  marginLeft: 14,
+                  fontFamily: "system-ui, sans-serif",
+                }}>
+                  {layer.sub}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -43,3 +139,7 @@ export const ArchitectureScene: React.FC = () => {
     </AbsoluteFill>
   );
 };
+
+function hexAlpha(value: number): string {
+  return Math.round(Math.max(0, Math.min(255, value))).toString(16).padStart(2, "0");
+}

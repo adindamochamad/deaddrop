@@ -11,7 +11,7 @@ export const SocialMedia: React.FC = () => {
       {/* Hook 0-5s */}
       <Sequence from={0} durationInFrames={150}>
         <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", padding: 48, opacity }}>
-          <p style={{ color: COLORS.orange, fontSize: 52, fontWeight: 700, textAlign: "center", lineHeight: 1.3 }}>
+          <p style={{ color: COLORS.amber, fontSize: 52, fontWeight: 700, textAlign: "center", lineHeight: 1.3 }}>
             Deployment agent kamu crash jam 2 pagi?
           </p>
         </AbsoluteFill>
@@ -24,7 +24,7 @@ export const SocialMedia: React.FC = () => {
             <p style={{ color: COLORS.red, marginBottom: 12 }}>$ agent crashed — rate limit hit</p>
             <p style={{ color: COLORS.muted }}>ERROR: AWS Bedrock 429 Too Many Requests</p>
             <p style={{ color: COLORS.muted }}>FATAL: deployment pipeline stopped</p>
-            <p style={{ color: COLORS.orange, marginTop: 12 }}>manual rollback required 😱</p>
+            <p style={{ color: COLORS.amber, marginTop: 12 }}>manual rollback required 😱</p>
           </div>
         </AbsoluteFill>
       </Sequence>

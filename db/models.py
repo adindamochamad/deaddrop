@@ -35,48 +35,48 @@ class JobStateHistory(Base):
     __tablename__ = "job_state_history"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    job_id = Column(String(36), ForeignKey("deployment_jobs.id"), nullable=False)
+    job_id = Column(String(36), ForeignKey("deployment_jobs.id"), nullable=False, index=True)
     from_state = Column(String(32))
     to_state = Column(String(32), nullable=False)
     reason = Column(Text)
-    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, index=True)
 
 
 class ToolAuditLog(Base):
     __tablename__ = "tool_audit_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    job_id = Column(String(36))
+    job_id = Column(String(36), index=True)
     tool_name = Column(String(64), nullable=False)
     params = Column(JSON)
     result = Column(JSON)
     status = Column(Enum(*TOOL_STATUSES), nullable=False)
     duration_ms = Column(Integer)
-    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, index=True)
 
 
 class GuardrailsLog(Base):
     __tablename__ = "guardrails_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    job_id = Column(String(36))
+    job_id = Column(String(36), index=True)
     rule_name = Column(String(64), nullable=False)
     action = Column(Enum(*GUARDRAIL_ACTIONS), nullable=False)
     detail = Column(Text)
-    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, index=True)
 
 
 class ProviderLog(Base):
     __tablename__ = "provider_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    job_id = Column(String(36))
+    job_id = Column(String(36), index=True)
     provider = Column(String(64), nullable=False)
-    model = Column(String(64), nullable=False)
+    model = Column(String(64), nullable=False, index=True)
     status = Column(Enum(*PROVIDER_STATUSES), nullable=False)
     latency_ms = Column(Integer)
     tokens_used = Column(Integer)
-    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, index=True)
 
 
 _engine = None

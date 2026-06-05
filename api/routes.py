@@ -35,7 +35,7 @@ class ChaosRequest(BaseModel):
 @router.post("/jobs")
 def trigger_job(req: CreateJobRequest):
     job_id = create_job(req.model_dump())
-    # Worker (started via lifespan) picks up the job — no duplicate thread here
+    # Worker process (python worker.py) picks up the job
     return {"job_id": job_id, "status": "pending"}
 
 

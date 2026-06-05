@@ -17,3 +17,4 @@ sse-starlette==2.1.0
 python-multipart==0.0.9
 pytest==8.2.2
 pytest-asyncio==0.23.7
+structlog==24.1.0

@@ -1,6 +1,6 @@
 # DeadDrop — Resilient Deployment Agent
 
-> 🎥 **WATCH VIDEO FIRST** (2 min): [YouTube Link](https://youtu.be/PLACEHOLDER)  
+> 🎥 **WATCH VIDEO FIRST** (2 min): [YouTube Link — placeholder](https://youtu.be/PLACEHOLDER)  
 > Judges: Start here before reading technical details.
 
 > **"Infrastructure dies. Your agent doesn't."**
@@ -29,8 +29,20 @@ Built on **TrueFoundry AI Gateway**, **MCP Gateway**, and **Guardrails** with AW
 
 ```bash
 pytest tests/test_integration_chaos.py -v   # 3 E2E resilience tests
-curl -sf https://deaddrop.adindamochamad.com/health
+curl -sf https://deaddrop.adindamochamad.com/health   # checks MySQL + TrueFoundry deps
 ```
+
+## Running Locally
+
+```bash
+# Terminal 1: API server
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+
+# Terminal 2: Worker process (required — jobs won't run without this)
+python worker.py --poll-interval 3
+```
+
+Docker: `docker compose up -d` starts mysql + api + worker together.
 
 ## How it works
 
@@ -48,17 +60,15 @@ curl -sf https://deaddrop.adindamochamad.com/health
 |---|---|---|
 | ![Overview](docs/screenshots/dashboard-overview.png) | ![Rate limit](docs/screenshots/dashboard-rate-limit.png) | ![Metrics](docs/screenshots/dashboard-metrics.png) |
 
-## Built by
-
-Solo project by **Panca** for the [Resilient Agents Online Hackathon](https://www.builderbase.com/v2/event/resilient-agents-online-hackathon) (TrueFoundry × AWS Bedrock), built in 4 days.
-
-**GitHub:** [github.com/adindamochamad/deaddrop](https://github.com/adindamochamad/deaddrop)
-
 Scenario buttons inject **controlled** failures for a reproducible demo. Production uses the **same TrueFoundry fallback chain** on real 429s and timeouts.
 
 ---
 
 **For technical details, see [ARCHITECTURE.md](ARCHITECTURE.md)** — setup, API reference, TrueFoundry config, project structure.
+
+**Built by:** Panca (solo project, 4 days)  
+**Stack:** Python, FastAPI, MySQL, TrueFoundry AI/MCP Gateway  
+**GitHub:** [github.com/adindamochamad/deaddrop](https://github.com/adindamochamad/deaddrop)
 
 ## License
 

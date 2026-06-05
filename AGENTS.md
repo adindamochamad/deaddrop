@@ -51,12 +51,14 @@ api/dashboard.html   → Live dashboard UI
 ## Perintah Umum
 
 ```bash
-# Dev server
+# Dev server (2 terminals)
 uvicorn api.main:app --host 0.0.0.0 --port 8000
+python worker.py
 
-# Docker full stack
+# Docker full stack (api + worker)
 docker compose up -d
 
+# Logging: from utils.logger import get_logger
 # Tests (37 total: unit + integration + validator)
 pytest tests/ -v
 pytest tests/test_integration_chaos.py -v   # E2E resilience proof

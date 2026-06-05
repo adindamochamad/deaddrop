@@ -156,19 +156,47 @@ mysql -u root -e "
 mysql -u deaddrop -p deaddrop < db/schema.sql
 ```
 
-### Run
+### Production Deployment (API + Worker separately)
+
+DeadDrop runs as **two processes** — API server handles HTTP, worker polls and processes jobs. If the worker crashes, restart it; jobs resume from MySQL checkpoints automatically.
 
 ```bash
+# Terminal 1 — API server
 uvicorn api.main:app --host 0.0.0.0 --port 8000
-open http://localhost:8000
+
+# Terminal 2 — Background worker (required for jobs to run)
+python worker.py
+
+# Test worker (single poll cycle)
+python worker.py --test
 ```
+
+Optional worker flags: `--poll-interval 5`, `--max-concurrent 2`
 
 ### Docker Compose (full stack)
 
 ```bash
-docker compose up -d
+docker compose up -d          # starts mysql + api + worker
 open http://localhost:8001
 ```
+
+### API Authentication
+
+Set `API_KEY` in `.env` to protect write endpoints (`POST /api/jobs`, `POST /api/scenario`, `POST /api/chaos/*`). Clients must send header:
+
+```
+X-API-Key: your-secret-key
+```
+
+The dashboard auto-injects the key when served from `/`. If `API_KEY` is unset, auth is disabled (demo mode).
+
+### Health Check
+
+```bash
+curl -s https://deaddrop.adindamochamad.com/health | jq
+```
+
+Returns dependency status for MySQL, TrueFoundry AI Gateway, and MCP Gateway.
 
 ---
 

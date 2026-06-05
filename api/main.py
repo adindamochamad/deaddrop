@@ -1,20 +1,19 @@
 import os
 import logging
-import threading
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from api.routes import router
+from api.auth import APIKeyMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(
-    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-)
+from utils.logger import get_logger
+
+log = get_logger("api")
 
 _DASHBOARD = Path(__file__).parent / "dashboard.html"
 _DASHBOARD_BG_JS = Path(__file__).parent / "dashboard-bg.js"
@@ -32,12 +31,7 @@ _mcp_asgi = _get_mcp_app()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _startup_checks()
-
-    # Start background worker
-    import worker
-    t = threading.Thread(target=worker.run, daemon=True)
-    t.start()
-    logging.getLogger("main").info("Worker started")
+    log.info("api_started", worker_mode="separate_process", hint="run: python worker.py")
 
     # Boot FastMCP's session manager (required for streamable-http transport)
     async with _mcp_asgi.lifespan(app):
@@ -84,6 +78,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(APIKeyMiddleware)
 
 app.include_router(router, prefix="/api")
 
@@ -102,8 +97,12 @@ _CACHE_TIDAK_SIMPAN = "no-store, no-cache, must-revalidate"
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
+    html = _DASHBOARD.read_text()
+    api_key = os.getenv("API_KEY", "")
+    injeksi = f'<script>window.DEADDROP_API_KEY="{api_key}";</script>'
+    html = html.replace("</head>", f"  {injeksi}\n</head>", 1)
     return HTMLResponse(
-        _DASHBOARD.read_text(),
+        html,
         headers={"Cache-Control": _CACHE_TIDAK_SIMPAN},
     )
 
@@ -135,5 +134,13 @@ def logo_gambar_asli():
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "service": "deaddrop"}
+async def health():
+    from api.health_checks import cek_semua_dependency, status_keseluruhan
+
+    dependencies = await cek_semua_dependency()
+    return {
+        "status": status_keseluruhan(dependencies),
+        "service": "deaddrop",
+        "worker_mode": "separate_process",
+        "dependencies": dependencies,
+    }

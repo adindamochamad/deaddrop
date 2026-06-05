@@ -87,10 +87,23 @@ def process_job(job_id: str):
     """Main agent loop. Resumes from last checkpoint on restart."""
     from agent.events import emit
     from gateway.ai_gateway import ProviderCircuitBreakerManager
+    from utils.logger import get_logger
+
+    log_struktur = get_logger("orchestrator")
+    waktu_mulai = time.time()
 
     job = _checkpoint.load(job_id)
     if not job:
         raise ValueError(f"Job {job_id} not found")
+
+    data_input = job.input_data or {}
+    log_struktur.info(
+        "job_started",
+        job_id=job_id,
+        service=data_input.get("service"),
+        target_env=data_input.get("target_env"),
+        status=job.status,
+    )
 
     sm = StateMachine(job_id, JobState(job.status))
     emit(job_id, "info", f"Agent picked up job {job_id[:8]} (state={sm.current.value})")
@@ -149,6 +162,17 @@ def process_job(job_id: str):
         job_id,
         "success" if status == "done" else "error",
         f"{'✅' if status == 'done' else '❌'} Job {job_id[:8]} — {status.upper()}"
+    )
+
+    log_struktur.info(
+        "job_finished",
+        job_id=job_id,
+        service=data_input.get("service"),
+        target_env=data_input.get("target_env"),
+        status=status,
+        duration_ms=int((time.time() - waktu_mulai) * 1000),
+        provider_switches=final.provider_switches if final else 0,
+        tool_failures=final.tool_failures if final else 0,
     )
 
 

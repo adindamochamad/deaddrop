@@ -1103,7 +1103,9 @@
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   async function post(url, body={}) {
-    try { await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); }
+    const headers = {'Content-Type':'application/json'};
+    if (window.DEADDROP_API_KEY) headers['X-API-Key'] = window.DEADDROP_API_KEY;
+    try { await fetch(url, { method:'POST', headers, body:JSON.stringify(body) }); }
     catch {}
   }
   const triggerJob  = () => post('/api/jobs', { service:'payment-service', version:'v2.4.1', target_env:'staging', replicas:3 });

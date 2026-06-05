@@ -17,6 +17,7 @@ build/
 deploy_artifacts/
 
 # Node / Remotion
+node_modules/
 video/node_modules/
 video/out/
 

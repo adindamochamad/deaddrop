@@ -1,6 +1,6 @@
 """
-Fixture bersama untuk integration tests.
-Memakai SQLite in-memory agar pytest tidak bergantung pada MySQL.
+Fixture bersama untuk semua tests.
+Memakai SQLite in-memory agar pytest tidak bergantung pada MySQL/pymysql.
 """
 
 import pytest
@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def db_test(monkeypatch):
     """Siapkan database in-memory dan paksa mode stub (tanpa TrueFoundry)."""
     import db.models as models

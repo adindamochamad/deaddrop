@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DeadDrop — Live Dashboard</title>
-  <link rel="icon" type="image/png" href="/picture/logo-favicon.png">
-  <link rel="apple-touch-icon" href="/picture/logo-header.png">
+  <link rel="icon" type="image/png" href="/picture/logo-favicon.png?v=2">
+  <link rel="apple-touch-icon" href="/picture/logo-header.png?v=2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -590,6 +590,45 @@
       border-bottom: 1px solid var(--border);
     }
     .scenario-demo-note strong { color: var(--accent-2); font-weight: 600; }
+
+    /* ── Quick demo script (judges) ── */
+    .demo-script-panel {
+      margin-bottom: 20px;
+      padding: 16px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(139,92,246,.08) 0%, rgba(17,17,19,.92) 55%);
+      backdrop-filter: blur(8px);
+    }
+    .demo-script-panel h2 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 10px;
+    }
+    .demo-script-panel ol {
+      margin: 0 0 12px 1.1rem;
+      color: var(--text-2);
+      font-size: 0.78rem;
+      line-height: 1.55;
+    }
+    .demo-script-panel li { margin-bottom: 4px; }
+    .demo-script-panel strong { color: var(--text); font-weight: 600; }
+    .demo-script-angka {
+      color: var(--orange);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .demo-script-what {
+      font-size: 0.72rem;
+      color: var(--text-3);
+      line-height: 1.5;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .demo-script-what strong { color: var(--text-2); }
     .scenario-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
@@ -715,7 +754,7 @@
   <header>
     <div class="header-left">
       <div class="logo-bingkai">
-        <img class="logo-gambar" src="/picture/logo-header.png" alt="DeadDrop" width="32" height="32" decoding="async" fetchpriority="high" />
+        <img class="logo-gambar" src="/picture/logo-header.png?v=2" alt="DeadDrop" width="32" height="32" decoding="async" fetchpriority="high" />
       </div>
       <div class="header-judul">
         <span class="logo">DeadDrop</span>
@@ -730,6 +769,21 @@
       </div>
     </div>
   </header>
+
+  <section class="demo-script-panel" aria-label="Quick demo guide for judges">
+    <h2>Quick Demo (2 minutes)</h2>
+    <ol>
+      <li>Click <strong>"B — Rate Limit"</strong> → watch automatic provider fallback in the live log</li>
+      <li>Click <strong>"C — Tool Timeout"</strong> → watch graceful degradation to notifier</li>
+      <li>Check metrics: <span class="demo-script-angka" id="demo-m-switches">—</span> provider switches,
+        <span class="demo-script-angka" id="demo-m-recovery">—</span> total recovery time</li>
+    </ol>
+    <p class="demo-script-what">
+      <strong>What you're seeing:</strong> real-time resilience in action —
+      circuit breaker detects failures, AI Gateway switches providers,
+      MCP tools degrade gracefully, and the job still finishes without manual intervention.
+    </p>
+  </section>
 
   <section class="hero-strip">
     <p>
@@ -968,7 +1022,10 @@
       setText('m-switches', d.provider_switches);
       setText('m-tools',    d.tool_failures);
       setText('m-gr',       d.guardrails_blocked);
-      setText('m-recovery', d.total_recovery_ms > 0 ? (d.total_recovery_ms/1000).toFixed(1)+'s' : '—');
+      const recoveryTeks = d.total_recovery_ms > 0 ? (d.total_recovery_ms/1000).toFixed(1)+'s' : '—';
+      setText('m-recovery', recoveryTeks);
+      setText('demo-m-switches', d.provider_switches);
+      setText('demo-m-recovery', recoveryTeks);
       renderProviderLog(d.recent_providers   || []);
       renderGuardrailsLog(d.recent_guardrails || []);
     } catch {}

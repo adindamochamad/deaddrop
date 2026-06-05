@@ -1,34 +1,68 @@
-# DeadDrop
+# DeadDrop — Resilient Deployment Agent
 
 > **"Infrastructure dies. Your agent doesn't."**
 
-DeadDrop is a deployment orchestration agent built to survive infrastructure failures. When your LLM provider rate-limits, when a deployment tool hangs, when the model returns garbage — DeadDrop keeps going.
-
-Built for the **[Resilient Agents Online Hackathon](https://www.builderbase.com/v2/event/resilient-agents-online-hackathon) — TrueFoundry × AWS Bedrock**.
-
 **Live Demo:** [deaddrop.adindamochamad.com](https://deaddrop.adindamochamad.com)  
-**Health check (judges):** [deaddrop.adindamochamad.com/health](https://deaddrop.adindamochamad.com/health)
+**Health (judges):** [deaddrop.adindamochamad.com/health](https://deaddrop.adindamochamad.com/health)  
+**Video:** [2-min demo guide](docs/DEMO_VIDEO_HACKATHON.md) *(replace with YouTube URL when uploaded)*  
+**Submission pack:** [docs/HACKATHON_SUBMISSION_EN.md](docs/HACKATHON_SUBMISSION_EN.md)
 
-**Hackathon submission pack (English):** [docs/HACKATHON_SUBMISSION_EN.md](docs/HACKATHON_SUBMISSION_EN.md)
+![DeadDrop dashboard — scenario buttons and live metrics](docs/screenshots/dashboard-overview.png)
 
-### Demo honesty (important for judges)
+## What is this?
 
-Scenario buttons inject **controlled** failures via `chaos_injector` so every judge sees the same resilience path. **Production uses the same TrueFoundry AI Gateway fallback chain** on real 429s, timeouts, and tool errors — chaos only triggers that path earlier for a reproducible demo.
+A deployment orchestration agent that **survives infrastructure failures**:
 
-Deploy tooling uses **graceful degradation** (deploy → notifier, same pattern as GitHub Actions / ArgoCD / Slack). Set `SLACK_WEBHOOK_URL` for a real alert during scenarios C/D. Resilience patterns are **environment-agnostic**; tools are swappable MCP implementations.
+- **Provider rate limit** → automatic fallback (Claude → Mistral → Llama)
+- **Tool timeout** → graceful degradation (deploy → notifier)
+- **Process crash** → resume from MySQL checkpoint
 
-### Pre-submit checklist
+Built on **TrueFoundry AI Gateway**, **MCP Gateway**, and **Guardrails** with AWS Bedrock.
+
+## Try it now (2 minutes)
+
+1. Open the **[live demo](https://deaddrop.adindamochamad.com)** — follow the **Quick Demo** panel at the top
+2. Click **"B — Rate Limit"** — watch provider switch in the live log (2–3 seconds)
+3. Click **"C — Tool Timeout"** — watch deploy degrade to notifier; job still finishes **DONE**
+
+Verify programmatically:
 
 ```bash
+pytest tests/test_integration_chaos.py -v   # 3 E2E resilience tests
 curl -sf https://deaddrop.adindamochamad.com/health
-# Dashboard: A → B → D (Full Chaos) twice without server restart
 ```
 
-Backup screen recording (30s Full Chaos): place at `docs/demo/full-chaos-backup.mp4` and link from your submission if live is down.
+## How it works
+
+| Mechanism | What it does |
+|---|---|
+| **Circuit breaker** | Per-provider CLOSED → OPEN → HALF_OPEN; bad provider never blocks the chain |
+| **AI Gateway fallback** | 3-model chain with automatic switch on 429 / timeout / outage |
+| **MCP tool health** | Quarantine + fallback; every call in `tool_audit_log` |
+| **Guardrails** | Native TrueFoundry + local YAML/permission checks before tool execution |
+| **MySQL checkpoints** | State saved every step — worker resumes after crash |
+
+## Screenshots
+
+| Dashboard overview | Rate limit scenario | Metrics & recovery |
+|---|---|---|
+| ![Overview](docs/screenshots/dashboard-overview.png) | ![Rate limit](docs/screenshots/dashboard-rate-limit.png) | ![Metrics](docs/screenshots/dashboard-metrics.png) |
+
+## Built by
+
+Solo project by **Panca** for the [Resilient Agents Online Hackathon](https://www.builderbase.com/v2/event/resilient-agents-online-hackathon) (TrueFoundry × AWS Bedrock), built in 4 days.
+
+**GitHub:** [github.com/adindamochamad/deaddrop](https://github.com/adindamochamad/deaddrop)
+
+### Demo honesty (for judges)
+
+Scenario buttons inject **controlled** failures via `chaos_injector` for a reproducible demo. **Production uses the same TrueFoundry fallback chain** on real 429s and timeouts. Deploy tooling uses **graceful degradation** (deploy → notifier) — same pattern as GitHub Actions / ArgoCD / Slack.
 
 ---
 
-## The Problem
+## Technical Details
+
+### The Problem
 
 ```
 2:00 AM — deployment deadline.
@@ -40,7 +74,7 @@ Deployment stops. Manual rollback.
 
 Every LLM-powered deployment pipeline has a single point of failure: the LLM itself. Rate limits, provider outages, slow responses, bad outputs — any one of them kills the job.
 
-## The Solution
+### The Solution
 
 DeadDrop treats infrastructure failures as expected events, not exceptions:
 
@@ -56,7 +90,7 @@ DeadDrop treats infrastructure failures as expected events, not exceptions:
 
 ---
 
-## Architecture
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -85,7 +119,7 @@ DeadDrop treats infrastructure failures as expected events, not exceptions:
 
 ---
 
-## Resilience Mechanisms
+### Resilience Mechanisms
 
 ### 1. Multi-Provider Fallback (AI Gateway)
 Three providers in priority order. The gateway routes automatically:
@@ -124,7 +158,7 @@ Providers that hang trigger a forced timeout. The agent doesn't wait — it swit
 
 ---
 
-## Demo Scenarios
+### Demo Scenarios
 
 The dashboard includes one-click scenario buttons. Each button resets chaos, injects the scenario’s failures, then starts a job — failures hit the **same code paths** as production (gateway fallback, MCP degradation, guardrails).
 
@@ -146,7 +180,7 @@ Every job ends with a **Resilience Chain summary** in the live log:
 
 ---
 
-## Quick Start
+### Quick Start
 
 ### Prerequisites
 - Python 3.11+
@@ -202,7 +236,7 @@ open http://localhost:8001
 
 ---
 
-## API Reference
+### API Reference
 
 ```
 POST /api/jobs                    Trigger a deployment job
@@ -253,7 +287,7 @@ curl -X POST https://deaddrop.adindamochamad.com/api/scenario \
 
 ---
 
-## Manifest Validation
+### Manifest Validation
 
 Generated manifests are validated in two stages:
 
@@ -283,7 +317,7 @@ pytest tests/test_validator.py -v
 
 ---
 
-## Scope & Limitations
+### Scope & Limitations
 
 ### Mock Deployments
 
@@ -323,7 +357,7 @@ Three E2E tests prove:
 
 ---
 
-## Project Structure
+### Project Structure
 
 ```
 deaddrop/
@@ -364,7 +398,7 @@ deaddrop/
 
 ---
 
-## Judging Criteria Coverage
+### Judging Criteria Coverage
 
 | Criteria | Implementation |
 |---|---|
@@ -378,7 +412,7 @@ deaddrop/
 
 ---
 
-## TrueFoundry Setup
+### TrueFoundry Setup
 
 **Tenant:** `adindamochamad.truefoundry.cloud`
 **AI Gateway URL:** `https://gateway.truefoundry.ai`

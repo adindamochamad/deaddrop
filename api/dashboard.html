@@ -4,8 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DeadDrop — Live Dashboard</title>
+  <link rel="icon" type="image/png" href="/picture/logo-favicon.png">
+  <link rel="apple-touch-icon" href="/picture/logo-header.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"></noscript>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -35,6 +39,17 @@
       --purple:      #a855f7;
       --purple-bg:   rgba(168,85,247,.07);
       --purple-bdr:  rgba(168,85,247,.22);
+      --accent:      #8b5cf6;
+      --accent-2:    #22d3ee;
+      --glow:        rgba(139, 92, 246, 0.35);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
 
     html { color-scheme: dark; }
@@ -45,17 +60,22 @@
       font-size: 13px;
       line-height: 1.5;
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
-    /* Dot grid overlay — Vercel signature */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image: radial-gradient(circle, #3f3f46 1px, transparent 1px);
-      background-size: 24px 24px;
-      opacity: .15;
-      pointer-events: none;
+    /* Three.js background */
+    #three-bg {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       z-index: 0;
+      pointer-events: none;
+    }
+
+    body.log-aktif #three-bg {
+      filter: brightness(1.08) saturate(1.15);
+      transition: filter 0.4s ease;
     }
 
     .container {
@@ -74,17 +94,164 @@
       border-bottom: 1px solid var(--border);
       margin-bottom: 24px;
     }
-    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo-bingkai {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      padding: 5px;
+      border-radius: 11px;
+      border: 1px solid var(--border-2);
+      background: rgba(17, 17, 19, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 4px 14px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .logo-gambar {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      border-radius: 6px;
+    }
+    .header-judul {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
     .logo {
       font-family: 'JetBrains Mono', monospace;
       font-size: 1.3rem;
       font-weight: 700;
       letter-spacing: -.04em;
-      background: linear-gradient(135deg, #fff 20%, #71717a);
+      background: linear-gradient(120deg, #fafafa 0%, #c4b5fd 45%, #67e8f9 100%);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .tagline { color: var(--text-3); font-size: 0.78rem; }
+    .tagline { color: var(--text-3); font-size: 0.78rem; max-width: 280px; line-height: 1.4; }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .hackathon-badge {
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      background: linear-gradient(135deg, rgba(139,92,246,.12), rgba(34,211,238,.08));
+      white-space: nowrap;
+    }
+    .hackathon-badge strong { color: var(--accent-2); font-weight: 700; }
+
+    /* ── Hero strip — narasi untuk juri hackathon ── */
+    .hero-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      background: linear-gradient(90deg, rgba(139,92,246,.08) 0%, rgba(17,17,19,.55) 40%, rgba(34,211,238,.06) 100%);
+      backdrop-filter: blur(10px);
+    }
+    .hero-strip p {
+      font-size: 0.8rem;
+      color: var(--text-2);
+      line-height: 1.45;
+      max-width: 720px;
+    }
+    .hero-strip p em {
+      font-style: normal;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .hero-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .hero-pill {
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--text-3);
+      background: rgba(0,0,0,.25);
+    }
+    .hero-pill.on { color: var(--accent-2); border-color: rgba(34,211,238,.35); background: rgba(34,211,238,.08); }
+
+    /* Legenda neural — sinkron dengan background Three.js */
+    .neural-legend {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      z-index: 2;
+      display: flex;
+      gap: 12px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(9, 9, 11, 0.75);
+      backdrop-filter: blur(12px);
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      pointer-events: none;
+    }
+    .neural-legend span { display: flex; align-items: center; gap: 5px; }
+    .neural-legend i {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .neural-legend .l-in i  { background: #71717a; box-shadow: 0 0 8px rgba(113,113,122,.5); }
+    .neural-legend .l-hid i { background: var(--accent); box-shadow: 0 0 8px var(--glow); }
+    .neural-legend .l-out i { background: var(--accent-2); box-shadow: 0 0 8px rgba(34,211,238,.45); }
+    body.log-aktif .neural-legend { border-color: rgba(139,92,246,.4); color: var(--text-2); }
+
+    /* Toast demo */
+    .demo-toast {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 100;
+      max-width: 320px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--green-bdr);
+      background: rgba(9, 9, 11, 0.92);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+      font-size: 0.78rem;
+      color: var(--text-2);
+      transform: translateX(120%);
+      opacity: 0;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+      pointer-events: none;
+    }
+    .demo-toast.tampil { transform: translateX(0); opacity: 1; }
+    .demo-toast strong { color: var(--green); display: block; margin-bottom: 4px; font-size: 0.7rem; }
     .live-badge {
       display: inline-flex; align-items: center; gap: 7px;
       background: var(--green-bg);
@@ -119,7 +286,9 @@
     @media(max-width:600px) { .metrics { grid-template-columns: repeat(2,1fr); } }
 
     .metric-card {
-      background: var(--surface);
+      background: rgba(17, 17, 19, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 14px 16px;
@@ -128,6 +297,14 @@
       transition: border-color .2s, transform .15s;
     }
     .metric-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
+    .metric-card.flash .metric-value {
+      animation: metric-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @keyframes metric-pop {
+      0%   { transform: scale(1); filter: brightness(1); }
+      40%  { transform: scale(1.08); filter: brightness(1.35); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
     /* Colored left accent bar */
     .metric-card::before {
       content: '';
@@ -172,10 +349,21 @@
 
     /* ── Panel base ── */
     .panel {
-      background: var(--surface);
+      background: rgba(17, 17, 19, 0.52);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border: 1px solid var(--border);
       border-radius: 10px;
       overflow: hidden;
+      transition: border-color 0.35s ease, box-shadow 0.35s ease;
+    }
+    body.log-aktif .panel-log {
+      border-color: rgba(59, 130, 246, 0.35);
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.08);
+    }
+    body.log-aktif.chaos-aktif .panel-log {
+      border-color: rgba(239, 68, 68, 0.4);
+      box-shadow: 0 0 48px rgba(239, 68, 68, 0.12);
     }
     .panel-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -193,13 +381,64 @@
     .panel-hint { font-size: 0.65rem; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
 
     /* ── Log terminal — Better Stack / Logtail inspired ── */
+    .panel-log {
+      background: rgba(12, 10, 20, 0.38);
+      position: relative;
+    }
+    .panel-log::before {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 10px;
+      pointer-events: none;
+      background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(139,92,246,.12), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    body.log-aktif .panel-log::before { opacity: 1; }
+    .neural-sync {
+      font-size: 0.62rem;
+      color: var(--accent);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    body.log-aktif .neural-sync { opacity: 1; }
+
+    .log-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 260px;
+      gap: 10px;
+      color: var(--text-3);
+      text-align: center;
+      padding: 24px;
+    }
+    .log-empty-icon {
+      font-size: 2rem;
+      opacity: 0.35;
+      line-height: 1;
+    }
+    .log-empty p { font-size: 0.8rem; max-width: 280px; line-height: 1.5; }
+    .log-empty kbd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-2);
+    }
     .log-terminal {
       height: 320px;
       overflow-y: auto;
       padding: 6px 4px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.76rem;
-      background: #080809;
+      background: rgba(6, 5, 12, 0.22);
       scrollbar-width: thin;
       scrollbar-color: var(--border-2) transparent;
     }
@@ -215,6 +454,18 @@
       border-radius: 4px;
       line-height: 1.65;
       transition: background .08s;
+      animation: log-masuk 0.35s ease-out;
+    }
+    @keyframes log-masuk {
+      from { opacity: 0; transform: translateX(-6px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    body.log-aktif .log-row:last-child .log-dot {
+      animation: dot-pulse 0.6s ease-out;
+    }
+    @keyframes dot-pulse {
+      0%   { transform: scale(2.2); filter: brightness(1.8); }
+      100% { transform: scale(1);   filter: brightness(1); }
     }
     .log-row:hover { background: rgba(255,255,255,.03); }
     .log-ts  { color: var(--text-3); font-size: 0.7rem; padding-top: 1px; }
@@ -331,6 +582,14 @@
 
     /* ── Scenario cards — Railway-inspired ── */
     .scenarios-wrap { margin-bottom: 0; }
+    .scenario-demo-note {
+      font-size: 0.72rem;
+      color: var(--text-3);
+      line-height: 1.45;
+      padding: 0 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .scenario-demo-note strong { color: var(--accent-2); font-weight: 600; }
     .scenario-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
@@ -354,6 +613,30 @@
     }
     .sc-card:hover { border-color: var(--border-2); background: rgba(255,255,255,.035); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.4); }
     .sc-card:active { transform: translateY(0); box-shadow: none; }
+    .sc-card.rekomendasi {
+      position: relative;
+      border-color: rgba(239, 68, 68, 0.45);
+      background: linear-gradient(145deg, rgba(239,68,68,.06), var(--surface-2));
+    }
+    .sc-card.rekomendasi::after {
+      content: '★ Demo highlight';
+      position: absolute;
+      top: 6px; right: 8px;
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--orange);
+    }
+    .sc-card.menjalankan {
+      pointer-events: none;
+      opacity: 0.65;
+      animation: sc-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes sc-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+      50%      { box-shadow: 0 0 24px rgba(139,92,246,.25); }
+    }
     .sc-card.c-green  { border-color: var(--green-bdr);  }
     .sc-card.c-green:hover  { border-color: var(--green);  background: var(--green-bg); }
     .sc-card.c-red    { border-color: var(--red-bdr);    }
@@ -419,19 +702,47 @@
   </style>
 </head>
 <body>
+<canvas id="three-bg" aria-hidden="true"></canvas>
+<div class="demo-toast" id="demo-toast" role="status" aria-live="polite"></div>
+<nav class="neural-legend" aria-hidden="true">
+  <span class="l-in"><i></i> Input</span>
+  <span class="l-hid"><i></i> Hidden</span>
+  <span class="l-out"><i></i> Output</span>
+</nav>
 <div class="container">
 
   <!-- ── Header ── -->
   <header>
     <div class="header-left">
-      <span class="logo">DeadDrop</span>
-      <span class="tagline">"Infrastructure dies. Your agent doesn't."</span>
+      <div class="logo-bingkai">
+        <img class="logo-gambar" src="/picture/logo-header.png" alt="DeadDrop" width="32" height="32" decoding="async" fetchpriority="high" />
+      </div>
+      <div class="header-judul">
+        <span class="logo">DeadDrop</span>
+        <span class="tagline">"Infrastructure dies. Your agent doesn't."</span>
+      </div>
     </div>
-    <div class="live-badge">
-      <span class="live-dot"></span>
-      Live
+    <div class="header-right">
+      <span class="hackathon-badge"><strong>TrueFoundry</strong> × AWS Bedrock</span>
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        Live
+      </div>
     </div>
   </header>
+
+  <section class="hero-strip">
+    <p>
+      <em>DeadDrop</em> — audit trail for SRE: every provider switch, guardrail block, and recovery ms is counted.
+      Scenario buttons inject <em>controlled</em> failures; production uses the same TrueFoundry/Bedrock fallback on real 429s.
+    </p>
+    <div class="hero-pills">
+      <span class="hero-pill on">AI Gateway</span>
+      <span class="hero-pill on">MCP Tools</span>
+      <span class="hero-pill on">Guardrails</span>
+      <span class="hero-pill on">Checkpoints</span>
+    </div>
+  </section>
 
   <!-- ── Metric cards ── -->
   <div class="metrics">
@@ -468,12 +779,19 @@
   <!-- ── Main: log + sidebar ── -->
   <div class="main-grid">
 
-    <div class="panel">
+    <div class="panel panel-log">
       <div class="panel-header">
         <span class="panel-title">Agent Live Log</span>
-        <span class="panel-hint">SSE · real-time</span>
+        <span class="panel-hint">
+          <span class="neural-sync">◎ neural trace · </span>SSE · real-time
+        </span>
       </div>
-      <div class="log-terminal" id="live-log"></div>
+      <div class="log-terminal" id="live-log">
+        <div class="log-empty" id="log-empty">
+          <span class="log-empty-icon">◎</span>
+          <p>Run <kbd>A — Normal</kbd> or <kbd>D — Full Chaos</kbd> below.<br>Watch the neural network propagate each agent event.</p>
+        </div>
+      </div>
     </div>
 
     <div class="side-stack">
@@ -517,28 +835,32 @@
       <span class="panel-title">Demo Scenarios</span>
       <span class="panel-hint">Resilient Agents Hackathon · TrueFoundry × AWS Bedrock</span>
     </div>
+    <p class="scenario-demo-note">
+      Judges: run <strong>A → B → D</strong>. Deploy tool degrades to <strong>notifier</strong> (same pattern as GitHub Actions / Slack).
+      Counters + Provider Log = proof, not animation.
+    </p>
     <div class="scenario-grid">
-      <button class="sc-card c-green" onclick="runScenario('normal')">
+      <button class="sc-card c-green" data-scenario="normal" onclick="runScenario('normal')">
         <span class="sc-icon">▶</span>
         <span class="sc-name">A — Normal</span>
         <span class="sc-desc">Clean run, no failures injected</span>
       </button>
-      <button class="sc-card c-red" onclick="runScenario('rate_limit')">
+      <button class="sc-card c-red" data-scenario="rate_limit" onclick="runScenario('rate_limit')">
         <span class="sc-icon">⏳</span>
         <span class="sc-name">B — Rate Limit</span>
         <span class="sc-desc">Sonnet 429 → Mistral fallback</span>
       </button>
-      <button class="sc-card c-orange" onclick="runScenario('slow_response')">
+      <button class="sc-card c-orange" data-scenario="slow_response" onclick="runScenario('slow_response')">
         <span class="sc-icon">⌛</span>
         <span class="sc-name">B2 — Slow Response</span>
         <span class="sc-desc">Forced timeout → switch provider</span>
       </button>
-      <button class="sc-card c-orange" onclick="runScenario('tool_timeout')">
+      <button class="sc-card c-orange" data-scenario="tool_timeout" onclick="runScenario('tool_timeout')">
         <span class="sc-icon">🔧</span>
         <span class="sc-name">C — Tool Timeout</span>
         <span class="sc-desc">github_deploy → notifier fallback</span>
       </button>
-      <button class="sc-card c-red" onclick="runScenario('full_chaos')">
+      <button class="sc-card c-red rekomendasi" data-scenario="full_chaos" onclick="runScenario('full_chaos')">
         <span class="sc-icon">💥</span>
         <span class="sc-name">D — Full Chaos</span>
         <span class="sc-desc">Cascading: outage + quarantine + bad output</span>
@@ -567,17 +889,54 @@
   </div>
 
   <footer>
-    <span>DeadDrop · Built for <a href="https://www.builderbase.com/v2/event/resilient-agents-online-hackathon" target="_blank">Resilient Agents Online Hackathon</a></span>
-    <span><a href="https://github.com/adindamochamad/deaddrop" target="_blank">github.com/adindamochamad/deaddrop</a></span>
+    <span>DeadDrop · <a href="https://www.builderbase.com/v2/event/resilient-agents-online-hackathon" target="_blank">Resilient Agents Online Hackathon</a> · TrueFoundry × AWS Bedrock</span>
+    <span><a href="https://deaddrop.adindamochamad.com" target="_blank">Live demo</a> · <a href="https://github.com/adindamochamad/deaddrop" target="_blank">Source</a></span>
   </footer>
 </div>
 
 <script>
-  // ── SSE live log ────────────────────────────────────────────────────────────
+  // ── SSE live log + interaksi Three.js ───────────────────────────────────────
   const logBox = document.getElementById('live-log');
   const MAX_LINES = 300;
+  let timerAktivitasLog = null;
+
+  function setAktivitasLog(ev) {
+    document.body.classList.add('log-aktif');
+    const level = ev.level || 'info';
+    document.body.classList.toggle('chaos-aktif', level === 'error' || /chaos|failed|outage/i.test(ev.message || ''));
+    clearTimeout(timerAktivitasLog);
+    timerAktivitasLog = setTimeout(() => {
+      document.body.classList.remove('log-aktif', 'chaos-aktif');
+    }, 2800);
+  }
+
+  const logEmpty = document.getElementById('log-empty');
+  const demoToast = document.getElementById('demo-toast');
+  let toastTimer = null;
+
+  const NAMA_SKENARIO = {
+    normal: 'A — Normal',
+    rate_limit: 'B — Rate Limit',
+    slow_response: 'B2 — Slow Response',
+    tool_timeout: 'C — Tool Timeout',
+    full_chaos: 'D — Full Chaos',
+  };
+
+  function tampilkanToast(judul, pesan) {
+    demoToast.innerHTML = `<strong>${esc(judul)}</strong>${esc(pesan)}`;
+    demoToast.classList.add('tampil');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => demoToast.classList.remove('tampil'), 4200);
+  }
+
+  function setSkenarioAktif(nama) {
+    document.querySelectorAll('.sc-card[data-scenario]').forEach((kartu) => {
+      kartu.classList.toggle('menjalankan', kartu.dataset.scenario === nama);
+    });
+  }
 
   function addLogLine(ev) {
+    if (logEmpty && logEmpty.parentNode) logEmpty.remove();
     const row = document.createElement('div');
     row.className = `log-row ${ev.level}`;
     const ts  = new Date(ev.ts * 1000).toISOString().slice(11, 23);
@@ -590,6 +949,9 @@
     logBox.appendChild(row);
     while (logBox.children.length > MAX_LINES) logBox.removeChild(logBox.firstChild);
     logBox.scrollTop = logBox.scrollHeight;
+
+    setAktivitasLog(ev);
+    window.deaddropBg?.onEventLog(ev);
   }
 
   const sse = new EventSource('/api/events');
@@ -614,7 +976,16 @@
 
   function setText(id, v) {
     const el = document.getElementById(id);
-    if (el && String(el.textContent) !== String(v)) el.textContent = v;
+    if (!el) return;
+    if (String(el.textContent) !== String(v)) {
+      el.textContent = v;
+      const kartu = el.closest('.metric-card');
+      if (kartu) {
+        kartu.classList.remove('flash');
+        void kartu.offsetWidth;
+        kartu.classList.add('flash');
+      }
+    }
   }
 
   function renderProviderLog(entries) {
@@ -681,7 +1052,29 @@
   const triggerJob  = () => post('/api/jobs', { service:'payment-service', version:'v2.4.1', target_env:'staging', replicas:3 });
   const chaos       = (t, target) => post(`/api/chaos/${t}`, { target });
   const chaosReset  = () => post('/api/chaos/reset');
-  const runScenario = n => post('/api/scenario', { scenario: n });
+  let pollMs = 2000;
+  async function runScenario(n) {
+    const label = NAMA_SKENARIO[n] || n;
+    setSkenarioAktif(n);
+    const hint = n === 'full_chaos'
+      ? 'Watch WARN/ERROR lines → DONE. Metrics & Guardrails should increment.'
+      : 'Agent running — watch log, Provider Log, and metric counters.';
+    tampilkanToast(`Scenario ${label}`, hint);
+    document.body.classList.add('log-aktif');
+    pollMs = 700;
+    startPoll();
+    try {
+      await post('/api/scenario', { scenario: n });
+      for (let i = 0; i < 24; i++) {
+        await fetchMetrics();
+        await new Promise(r => setTimeout(r, 500));
+      }
+    } finally {
+      pollMs = 2000;
+      startPoll();
+      setTimeout(() => setSkenarioAktif(null), 3500);
+    }
+  }
 
   const shortModel = m => {
     if (m.includes('claude-sonnet')) return 'Claude Sonnet 4.6';
@@ -692,8 +1085,35 @@
   const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // ── Boot ─────────────────────────────────────────────────────────────────────
+  let pollTimer = null;
+  function startPoll() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => { fetchMetrics(); fetchJobs(); }, pollMs);
+  }
   fetchMetrics(); fetchJobs();
-  setInterval(() => { fetchMetrics(); fetchJobs(); }, 2000);
+  startPoll();
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+  // Versi query mencegah browser memakai dashboard-bg.js lama (tema galaksi)
+  const VERSI_LATAR = 'hackathon-final-v1';
+  const muatLatarThree = () =>
+    import(`/dashboard-bg.js?v=${VERSI_LATAR}`).catch((err) => {
+      console.error('[DeadDrop] Gagal memuat background Three.js:', err);
+    });
+  const jadwalkan = (fn) => {
+    if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout: 600 });
+    else setTimeout(fn, 50);
+  };
+  if (document.readyState === 'complete') jadwalkan(muatLatarThree);
+  else window.addEventListener('load', () => jadwalkan(muatLatarThree));
 </script>
 </body>
 </html>

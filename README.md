@@ -6,7 +6,25 @@ DeadDrop is a deployment orchestration agent built to survive infrastructure fai
 
 Built for the **[Resilient Agents Online Hackathon](https://www.builderbase.com/v2/event/resilient-agents-online-hackathon) — TrueFoundry × AWS Bedrock**.
 
-**Live Demo:** [deaddrop.adindamochamad.com](https://deaddrop.adindamochamad.com)
+**Live Demo:** [deaddrop.adindamochamad.com](https://deaddrop.adindamochamad.com)  
+**Health check (judges):** [deaddrop.adindamochamad.com/health](https://deaddrop.adindamochamad.com/health)
+
+**Hackathon submission pack (English):** [docs/HACKATHON_SUBMISSION_EN.md](docs/HACKATHON_SUBMISSION_EN.md)
+
+### Demo honesty (important for judges)
+
+Scenario buttons inject **controlled** failures via `chaos_injector` so every judge sees the same resilience path. **Production uses the same TrueFoundry AI Gateway fallback chain** on real 429s, timeouts, and tool errors — chaos only triggers that path earlier for a reproducible demo.
+
+Deploy tooling uses **graceful degradation** (deploy → notifier, same pattern as GitHub Actions / ArgoCD / Slack). Set `SLACK_WEBHOOK_URL` for a real alert during scenarios C/D. Resilience patterns are **environment-agnostic**; tools are swappable MCP implementations.
+
+### Pre-submit checklist
+
+```bash
+curl -sf https://deaddrop.adindamochamad.com/health
+# Dashboard: A → B → D (Full Chaos) twice without server restart
+```
+
+Backup screen recording (30s Full Chaos): place at `docs/demo/full-chaos-backup.mp4` and link from your submission if live is down.
 
 ---
 
@@ -108,7 +126,9 @@ Providers that hang trigger a forced timeout. The agent doesn't wait — it swit
 
 ## Demo Scenarios
 
-The dashboard includes one-click scenario buttons that inject real failures mid-job:
+The dashboard includes one-click scenario buttons. Each button resets chaos, injects the scenario’s failures, then starts a job — failures hit the **same code paths** as production (gateway fallback, MCP degradation, guardrails).
+
+**Framing for judges:** say “deploy tool with notifier fallback,” not “mock deploy.” Counters (`provider_switches`, `guardrails_blocked`, `total_recovery_ms`) and `provider_log` rows are the **audit trail**.
 
 | Scenario | Chaos Injected | What You See |
 |---|---|---|
@@ -324,7 +344,7 @@ deaddrop/
 ├── tools/
 │   ├── github_deploy.py      # Deploy tool (mock: writes locally)
 │   ├── validator.py          # YAML/JSON manifest validation
-│   └── notifier.py           # Alert tool (mock: logs to console)
+│   └── notifier.py           # Alerts: console + optional Slack webhook
 ├── db/
 │   ├── models.py             # SQLAlchemy models (5 tables)
 │   └── schema.sql            # Raw SQL schema
@@ -352,8 +372,9 @@ deaddrop/
 | **MCP Gateway** | 3 tools live at `gateway.truefoundry.ai/adindamochamad/mcp/deaddrop-mcp/server`, scoped permissions, Bearer auth, audit log in MySQL, tool quarantine + fallback |
 | **Guardrails** | TrueFoundry native: Secrets Detection (MUTATE), Prompt Injection (VALIDATE), PII/PHI (MUTATE) — applied to all LLM input/output. Local layer: YAML validation pre-tool, tool result inspection, production deploy block |
 | **Resilience** | 6 failure modes covered, state checkpoints, exponential backoff, graceful degradation |
-| **Usefulness** | Backend engineer deploying at 2am — concrete, real scenario |
-| **Demo clarity** | One-click scenarios, SSE live log, resilience chain summary per job |
+| **Usefulness** | 2 AM deploy engineer; deploy→notifier degradation maps to real CI/CD + Slack |
+| **Demo clarity** | One-click scenarios, SSE live log, audit counters, `/health` for judges |
+| **Credibility** | `provider_log` + guardrails log; optional TrueFoundry console screenshot in video |
 
 ---
 

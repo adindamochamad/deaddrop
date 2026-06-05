@@ -6,14 +6,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Mock: writes deploy artifacts locally instead of pushing to GitHub
+# Swappable MCP deploy tool: writes artifacts locally (swap for GitHub Actions / ArgoCD in production)
 DEPLOY_DIR = Path("deploy_artifacts")
 
 
 def deploy(params: dict) -> dict:
     """
     MCP Tool: github_deploy
-    Pushes deployment config to a GitHub repo (mocked: writes to local dir).
+    Deploy tool — persists manifest locally; production can target GitHub/ArgoCD via same MCP contract.
     params: { job_id, config_content, target_env, manifest_path }
     """
     job_id = params.get("job_id", "unknown")

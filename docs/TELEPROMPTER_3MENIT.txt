@@ -1,0 +1,15 @@
+[0:00] Bayangkan jam dua pagi. Tim harus deploy aplikasi. Mereka pakai agent AI. Tiba-tiba layanan AI penuh atau mati. Agent berhenti. Deploy gagal. Itu masalah DeadDrop.
+
+[0:20] DeadDrop adalah agent deploy yang tidak mudah menyerah. Kalau AI kehabisan kuota, tool macet, atau output salah — sistem tidak langsung crash. Ada cadangan, pengecekan keamanan, dan memori langkah terakhir.
+
+[0:45] Resilience empat lapis. Satu: otak cadangan — beberapa model AI, Claude penuh ganti Mistral lalu Llama. Dua: alat cadangan — deploy, validasi, notifikasi; tool timeout ada fallback. Tiga: guardrails — sembunyikan API key, blok deploy berbahaya, cek YAML. Empat: checkpoint — agent mati bisa lanjut dari langkah terakhir. Garis neural di belakang = log agent mengalir seperti sinyal AI.
+
+[1:15] Klik Normal. Log hijau, job DONE. Baseline ketika semua baik.
+
+[1:35] Klik Rate Limit. Peringatan kuning, ganti model cadangan. Provider Switches naik. Job tetap selesai.
+
+[1:55] Klik Full Chaos. Banyak error sekaligus — tapi akhirnya DONE. Recovery tercatat. Ini bukti agent tahan badai.
+
+[2:15] Angka di dashboard adalah bukti: switch provider, tool gagal, guardrail blokir. Built dengan TrueFoundry — AI Gateway, MCP, Guardrails — dan AWS Bedrock. Hackathon Resilient Agents.
+
+[2:45] Infrastruktur boleh mati — agent Anda tidak harus ikut mati. deaddrop.adindamochamad.com. Terima kasih.

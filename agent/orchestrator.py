@@ -3,6 +3,8 @@ import uuid
 import time
 import random
 import logging
+import os
+import concurrent.futures
 from datetime import datetime
 
 from db.models import get_session, DeploymentJob
@@ -17,6 +19,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 BASE_BACKOFF_S = 1.0
 MAX_BACKOFF_S = 30.0
+DEPLOY_STEP_TIMEOUT_S = float(os.getenv("DEPLOY_STEP_TIMEOUT_S", "90"))
 
 _checkpoint = CheckpointManager()
 
@@ -304,11 +307,19 @@ def _step_deploy(job_id: str, job: DeploymentJob, cb_manager):
     emit(job_id, "info", f"Deploying to {input_data.get('target_env','staging')}...")
     t0 = time.time()
     try:
-        result = call_tool("github_deploy", args, job_id=job_id)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(call_tool, "github_deploy", args, job_id=job_id)
+            result = fut.result(timeout=DEPLOY_STEP_TIMEOUT_S)
         elapsed_ms = int((time.time() - t0) * 1000)
         result = inspect_tool_result("github_deploy", result, job_id=job_id)
         if result.get("_fallback_used"):
             _checkpoint.increment_metric(job_id, "tool_failures")
+            emit(job_id, "warn", "Deploy tool degraded → notifier fallback (same pattern as GitHub Actions / ArgoCD)")
+    except concurrent.futures.TimeoutError:
+        _checkpoint.increment_metric(job_id, "tool_failures")
+        raise ToolTimeoutError(
+            f"github_deploy exceeded {DEPLOY_STEP_TIMEOUT_S:.0f}s — treating as timeout for retry/fallback"
+        )
     except (ToolQuarantinedError, ToolTimeoutError) as e:
         _checkpoint.increment_metric(job_id, "tool_failures")
         raise

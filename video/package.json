@@ -4,8 +4,15 @@
   "private": true,
   "scripts": {
     "start": "npx remotion studio",
+    "voiceover": "node scripts/generate-elevenlabs.mjs",
+    "record:dashboard": "node scripts/record-dashboard.mjs",
     "render:demo": "npx remotion render HackathonDemo out/deaddrop-demo.mp4 --codec=h264",
+    "render:demo:vo": "npx remotion render HackathonDemo out/deaddrop-demo-vo.mp4 --codec=h264 --props='{\"denganVoiceover\":true}'",
     "render:social": "npx remotion render SocialMedia out/deaddrop-social.mp4 --codec=h264",
+    "render:broll:intro": "npx remotion render BrollIntro out/broll-intro.mp4 --codec=h264",
+    "render:broll:pipeline": "npx remotion render BrollPipeline out/broll-pipeline.mp4 --codec=h264",
+    "render:broll:closing": "npx remotion render BrollClosing out/broll-closing.mp4 --codec=h264",
+    "render:broll": "npm run render:broll:intro && npm run render:broll:pipeline && npm run render:broll:closing",
     "render:all": "npm run render:demo && npm run render:social"
   },
   "dependencies": {

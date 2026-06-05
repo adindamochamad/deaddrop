@@ -1,43 +1,51 @@
 import React from "react";
-import { AbsoluteFill, Sequence } from "remotion";
-import { SCENES } from "../constants";
-import { HookScene }         from "../scenes/00_Hook";
-import { IntroScene }        from "../scenes/01_Intro";
+import { AbsoluteFill, Audio, Sequence, staticFile } from "remotion";
+import { SCENES, DEMO_DURATION } from "../constants";
+import { HookScene } from "../scenes/00_Hook";
+import { IntroScene } from "../scenes/01_Intro";
 import { ArchitectureScene } from "../scenes/02_Architecture";
-import { DemoScene }         from "../scenes/03_Demo";
-import { MetricsScene }      from "../scenes/04_Metrics";
-import { ClosingScene }      from "../scenes/05_Closing";
+import { LiveDashboardScene } from "../scenes/06_LiveDashboard";
+import { PlatformProofScene } from "../scenes/07_PlatformProof";
+import { MetricsScene } from "../scenes/04_Metrics";
+import { ClosingScene } from "../scenes/05_Closing";
+import { BarAlur } from "../ui-kit";
 
-// DemoScene covers DEMO_NORMAL → DEMO_FAIL1 → DEMO_FAIL2 → DEMO_DONE in one sequence
-const DEMO_TOTAL =
-  SCENES.DEMO_DONE.start + SCENES.DEMO_DONE.duration - SCENES.DEMO_NORMAL.start;
+export type PropsHackathonDemo = {
+  denganVoiceover?: boolean;
+};
 
-export const HackathonDemo: React.FC = () => {
+export const HackathonDemo: React.FC<PropsHackathonDemo> = ({ denganVoiceover = false }) => {
   return (
-    <AbsoluteFill style={{ background: "#050505" }}>
-      <Sequence from={SCENES.HOOK.start}         durationInFrames={SCENES.HOOK.duration}>
+    <AbsoluteFill style={{ background: "#09090b" }}>
+      {denganVoiceover && <Audio src={staticFile("voiceover.mp3")} volume={1} />}
+
+      <Sequence from={SCENES.HOOK.start} durationInFrames={SCENES.HOOK.duration}>
         <HookScene />
       </Sequence>
-
-      <Sequence from={SCENES.INTRO.start}        durationInFrames={SCENES.INTRO.duration}>
+      <Sequence from={SCENES.INTRO.start} durationInFrames={SCENES.INTRO.duration}>
         <IntroScene />
       </Sequence>
-
       <Sequence from={SCENES.ARCHITECTURE.start} durationInFrames={SCENES.ARCHITECTURE.duration}>
         <ArchitectureScene />
       </Sequence>
-
-      {/* Single sequence covers all demo sub-scenes including DONE state */}
-      <Sequence from={SCENES.DEMO_NORMAL.start}  durationInFrames={DEMO_TOTAL}>
-        <DemoScene />
+      <Sequence from={SCENES.PLATFORM_PROOF.start} durationInFrames={SCENES.PLATFORM_PROOF.duration}>
+        <PlatformProofScene />
       </Sequence>
-
-      <Sequence from={SCENES.METRICS.start}      durationInFrames={SCENES.METRICS.duration}>
+      <Sequence from={SCENES.LIVE_DEMO.start} durationInFrames={SCENES.LIVE_DEMO.duration}>
+        <LiveDashboardScene />
+      </Sequence>
+      <Sequence from={SCENES.METRICS.start} durationInFrames={SCENES.METRICS.duration}>
         <MetricsScene />
       </Sequence>
-
-      <Sequence from={SCENES.CLOSING.start}      durationInFrames={SCENES.CLOSING.duration}>
+      <Sequence from={SCENES.CLOSING.start} durationInFrames={SCENES.CLOSING.duration}>
         <ClosingScene />
+      </Sequence>
+
+      {/* Bar alur — seluruh video */}
+      <Sequence from={0} durationInFrames={DEMO_DURATION}>
+        <AbsoluteFill style={{ pointerEvents: "none" }}>
+          <BarAlur />
+        </AbsoluteFill>
       </Sequence>
     </AbsoluteFill>
   );

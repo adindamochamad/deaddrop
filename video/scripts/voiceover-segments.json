@@ -1,0 +1,37 @@
+[
+  {
+    "id": "hook",
+    "durasiDetik": 18,
+    "teks": "Two AM. The team must ship. An AI deploy agent is running. Then Bedrock throttles — error four twenty nine. The agent stops. Deploy fails. An engineer wakes up for manual rollback. That is the problem DeadDrop solves."
+  },
+  {
+    "id": "intro",
+    "durasiDetik": 14,
+    "teks": "DeadDrop — a deploy agent that survives when infrastructure fails. Infrastructure dies. Your agent doesn't. Built for the Resilient Agents hackathon on TrueFoundry and AWS Bedrock."
+  },
+  {
+    "id": "arsitektur",
+    "durasiDetik": 22,
+    "teks": "Four layers. One: TrueFoundry AI Gateway — when the primary model is full, we fall back automatically. Two: state machine with MySQL checkpoints. Three: MCP tools with circuit breakers and deploy to notifier degradation. Four: guardrails that block bad manifests before production."
+  },
+  {
+    "id": "platform_proof",
+    "durasiDetik": 15,
+    "teks": "This is not chaos theater. Every LLM call is written to provider log in MySQL. Scenario buttons only inject failures early — production uses the same gateway chain on real rate limits and timeouts. Guardrail hits are audited for SRE and compliance."
+  },
+  {
+    "id": "live_demo",
+    "durasiDetik": 73,
+    "teks": "Live dashboard at deaddrop dot adindamochamad dot com. Scenario A normal — clean path, zero switches. Scenario B rate limit — Claude four twenty nine, circuit breaker opens, Mistral recovers, job done. Now D full chaos — watch the log: warnings, errors, guardrail block, deploy quarantine, notifier fallback. Metrics climb — switches, guardrails, recovery time. The job still finishes. Zero manual steps."
+  },
+  {
+    "id": "metrics",
+    "durasiDetik": 20,
+    "teks": "These counters are an audit trail for operators — not decoration. Jobs done, provider switches, tool failures handled, guardrail blocks, recovery milliseconds. TrueFoundry gateway, MCP, guardrails — one pipeline you can prove to a judge or an SRE."
+  },
+  {
+    "id": "closing",
+    "durasiDetik": 18,
+    "teks": "DeadDrop — resilient deploy agent. TrueFoundry times AWS Bedrock. Try the live demo. Open source on GitHub. DeadDrop. Infrastructure dies. Your agent doesn't. Thank you."
+  }
+]

@@ -5,7 +5,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from api.routes import router
 from dotenv import load_dotenv
 
@@ -17,6 +17,12 @@ logging.basicConfig(
 )
 
 _DASHBOARD = Path(__file__).parent / "dashboard.html"
+_DASHBOARD_BG_JS = Path(__file__).parent / "dashboard-bg.js"
+_PICTURE = Path(__file__).parent.parent / "picture"
+_LOGO_FAVICON = _PICTURE / "logo-favicon.png"
+_LOGO_HEADER = _PICTURE / "logo-header.png"
+# Fallback ke file asli jika versi kecil belum ada
+_LOGO_ASLI = _PICTURE / "Logo.png"
 
 
 from gateway.mcp_server import get_mcp_app as _get_mcp_app
@@ -91,9 +97,41 @@ app.include_router(guardrail_router)
 app.mount("/mcp", _mcp_asgi)
 
 
+_CACHE_TIDAK_SIMPAN = "no-store, no-cache, must-revalidate"
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
-    return _DASHBOARD.read_text()
+    return HTMLResponse(
+        _DASHBOARD.read_text(),
+        headers={"Cache-Control": _CACHE_TIDAK_SIMPAN},
+    )
+
+
+@app.get("/dashboard-bg.js")
+def dashboard_bg_js():
+    return FileResponse(
+        _DASHBOARD_BG_JS,
+        media_type="application/javascript",
+        headers={"Cache-Control": _CACHE_TIDAK_SIMPAN},
+    )
+
+
+@app.get("/picture/logo-favicon.png")
+def logo_favicon():
+    berkas = _LOGO_FAVICON if _LOGO_FAVICON.exists() else _LOGO_ASLI
+    return FileResponse(berkas, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/picture/logo-header.png")
+def logo_header():
+    berkas = _LOGO_HEADER if _LOGO_HEADER.exists() else _LOGO_ASLI
+    return FileResponse(berkas, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/picture/Logo.png")
+def logo_gambar_asli():
+    return FileResponse(_LOGO_ASLI, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/health")

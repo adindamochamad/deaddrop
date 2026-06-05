@@ -233,6 +233,76 @@ curl -X POST https://deaddrop.adindamochamad.com/api/scenario \
 
 ---
 
+## Manifest Validation
+
+Generated manifests are validated in two stages:
+
+1. **YAML syntax** — `yaml.safe_load_all()` parses multi-document manifests
+2. **K8s schema** — `kubectl apply --dry-run=client` (when `kubectl` is installed)
+
+If `kubectl` is not available, validation falls back to YAML syntax only (`k8s_valid: null`).
+
+Example validation output:
+
+```json
+{
+  "valid": true,
+  "yaml_valid": true,
+  "k8s_valid": true,
+  "errors": [],
+  "doc_count": 1,
+  "kinds": ["Deployment"]
+}
+```
+
+Run validator tests:
+
+```bash
+pytest tests/test_validator.py -v
+```
+
+---
+
+## Scope & Limitations
+
+### Mock Deployments
+
+The `github_deploy` tool writes manifests to the local `deploy_artifacts/` directory instead of pushing to an actual GitHub repository or Kubernetes cluster.
+
+**Rationale:**
+- Isolate resilience testing from deployment complexity
+- Demonstrate state machine + chaos engineering without external dependencies
+- Hackathon scope (4 days) — a production version would integrate:
+  - GitHub API (push manifest + create PR)
+  - `kubectl apply` or ArgoCD for K8s deployment
+  - Webhook notifications to Slack/PagerDuty
+
+**Production extension path:**
+
+```python
+# In production, github_deploy would:
+# 1. Authenticate with GitHub App / Personal Access Token
+# 2. Clone target repo (e.g., company/k8s-manifests)
+# 3. Write manifest to environments/{env}/{service}.yaml
+# 4. Create Pull Request with deployment metadata
+# 5. Wait for CI/CD approval (optional)
+```
+
+### Integration Tests
+
+Resilience is verified programmatically — not just claimed in the demo:
+
+```bash
+pytest tests/test_integration_chaos.py -v
+```
+
+Three E2E tests prove:
+- Provider rate limit → automatic fallback → job `done`
+- Tool timeout → fallback to `notifier` → `tool_failures` recorded
+- Cascading chaos (rate limit + tool timeout) → job still completes
+
+---
+
 ## Project Structure
 
 ```
@@ -265,7 +335,7 @@ deaddrop/
 ├── demo/
 │   ├── chaos_injector.py     # Injects failures into running system
 │   └── scenarios.py          # Named demo scenarios (A/B/B2/C/D)
-├── tests/                    # 29 unit tests (circuit breaker, guardrails, state machine)
+├── tests/                    # 37 tests (unit + integration + validator)
 ├── video/                    # Remotion submission video (Day 5)
 ├── docker-compose.yml
 ├── requirements.txt

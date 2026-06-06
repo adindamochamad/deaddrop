@@ -88,9 +88,30 @@ class Subscription:
 _bus = EventBus()
 
 
+def _save_to_db(event: AgentEvent):
+    """Persist to MySQL so the worker process's events reach the API's SSE clients."""
+    try:
+        from db.models import get_session, AgentEventRow
+        session = get_session()
+        try:
+            session.add(AgentEventRow(
+                job_id=event.job_id,
+                level=event.level,
+                message=event.message,
+                ts=event.ts,
+            ))
+            session.commit()
+        finally:
+            session.close()
+    except Exception:
+        pass  # never break the agent on logging failure
+
+
 def emit(job_id: str, level: str, message: str):
     """Convenience function — call this anywhere to publish an agent event."""
-    _bus.publish(AgentEvent(job_id=job_id, level=level, message=message))
+    event = AgentEvent(job_id=job_id, level=level, message=message)
+    _bus.publish(event)
+    _save_to_db(event)
 
 
 def get_bus() -> EventBus:

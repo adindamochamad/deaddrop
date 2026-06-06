@@ -57,6 +57,25 @@ CREATE TABLE IF NOT EXISTS provider_log (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Live log events — written by both API and worker processes for cross-process SSE
+CREATE TABLE IF NOT EXISTS agent_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    job_id VARCHAR(64) NOT NULL,
+    level VARCHAR(16) NOT NULL,
+    message TEXT NOT NULL,
+    ts DOUBLE NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_agent_events_ts (ts),
+    INDEX idx_agent_events_job_id (job_id)
+);
+
+-- Key-value store for shared app state (e.g. cross-process chaos injection)
+CREATE TABLE IF NOT EXISTS app_config (
+    key_name VARCHAR(64) PRIMARY KEY,
+    value_json JSON NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Indexes untuk query audit trail per job
 CREATE INDEX idx_job_state_history_job_id ON job_state_history(job_id);
 CREATE INDEX idx_job_state_history_created_at ON job_state_history(created_at);

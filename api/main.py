@@ -49,6 +49,16 @@ def _startup_checks():
         log.warning("TrueFoundry credentials not set — running in stub/local mode (no real LLM calls)")
 
     if tfy_key and tfy_url:
+        from gateway.ai_gateway import get_routing_mode, TFY_VIRTUAL_MODEL
+        routing = get_routing_mode()
+        if routing == "tfy_native":
+            log.info(f"Routing mode: tfy_native (TFY_VIRTUAL_MODEL={TFY_VIRTUAL_MODEL})")
+        else:
+            log.info(
+                "Routing mode: app_layer — explicit multi-provider loop with circuit breakers. "
+                "Set TFY_VIRTUAL_MODEL to delegate routing to TrueFoundry AI Gateway natively."
+            )
+
         if not input_id and not output_id:
             log.warning(
                 "TFY_GUARDRAIL_INPUT_ID and TFY_GUARDRAIL_OUTPUT_ID are not set — "

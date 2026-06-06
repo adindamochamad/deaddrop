@@ -86,7 +86,8 @@ def create_job(input_data: dict) -> str:
 def process_job(job_id: str):
     """Main agent loop. Resumes from last checkpoint on restart."""
     from agent.events import emit
-    from gateway.ai_gateway import ProviderCircuitBreakerManager
+    from gateway.ai_gateway import get_cb_manager
+    from gateway.chaos_state import sync_to_gateways
     from utils.logger import get_logger
 
     log_struktur = get_logger("orchestrator")
@@ -95,6 +96,9 @@ def process_job(job_id: str):
     job = _checkpoint.load(job_id)
     if not job:
         raise ValueError(f"Job {job_id} not found")
+
+    # Sync chaos state from MySQL so this worker process sees what the API process injected
+    sync_to_gateways()
 
     data_input = job.input_data or {}
     log_struktur.info(
@@ -108,7 +112,7 @@ def process_job(job_id: str):
     sm = StateMachine(job_id, JobState(job.status))
     emit(job_id, "info", f"Agent picked up job {job_id[:8]} (state={sm.current.value})")
 
-    cb_manager = ProviderCircuitBreakerManager()
+    cb_manager = get_cb_manager()
 
     # Pipeline: (trigger_state, enter_state, handler, success_state)
     # trigger_state == enter_state means "no pre-transition needed" (already in the right state)

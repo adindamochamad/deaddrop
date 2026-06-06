@@ -38,6 +38,19 @@ def _cek_mysql() -> dict:
         return {"status": "error", "detail": str(galat)}
 
 
+def _guardrails_mode() -> str:
+    input_id  = os.getenv("TFY_GUARDRAIL_INPUT_ID", "")
+    output_id = os.getenv("TFY_GUARDRAIL_OUTPUT_ID", "")
+    if input_id or output_id:
+        parts = []
+        if input_id:
+            parts.append(f"input={input_id}")
+        if output_id:
+            parts.append(f"output={output_id}")
+        return f"tfy_native ({', '.join(parts)})"
+    return "local_regex"
+
+
 async def cek_semua_dependency() -> dict:
     """Jalankan semua health check dependency."""
     tfy_key = os.getenv("TRUEFOUNDRY_API_KEY", "")
@@ -68,6 +81,12 @@ async def cek_semua_dependency() -> dict:
             "status": "local",
             "detail": "TFY_MCP_GATEWAY_URL not set — using local MCP mock",
         }
+
+    # Routing mode and guardrails mode — visible to judges
+    from gateway.ai_gateway import get_routing_mode, get_cb_states
+    hasil["routing_mode"] = get_routing_mode()
+    hasil["guardrails_mode"] = _guardrails_mode()
+    hasil["circuit_breakers"] = get_cb_states()
 
     return hasil
 

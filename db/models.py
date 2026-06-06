@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, Integer, Text, Enum, JSON, TIMESTAMP, BigInteger, ForeignKey
+from sqlalchemy import create_engine, Column, String, Integer, Float, Text, Enum, JSON, TIMESTAMP, BigInteger, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
@@ -77,6 +77,27 @@ class ProviderLog(Base):
     latency_ms = Column(Integer)
     tokens_used = Column(Integer)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, index=True)
+
+
+class AgentEventRow(Base):
+    """Persistent agent events for cross-process SSE streaming (worker → API)."""
+    __tablename__ = "agent_events"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    job_id = Column(String(64), nullable=False, index=True)
+    level = Column(String(16), nullable=False)
+    message = Column(Text, nullable=False)
+    ts = Column(Float, nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, index=True)
+
+
+class AppConfig(Base):
+    """Generic key-value store — used for cross-process chaos state sharing."""
+    __tablename__ = "app_config"
+
+    key_name = Column(String(64), primary_key=True)
+    value_json = Column(JSON, nullable=False)
+    updated_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 _engine = None

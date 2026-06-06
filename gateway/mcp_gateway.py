@@ -129,6 +129,27 @@ def call_tool(tool_name: str, params: dict, job_id: str | None = None,
 
 
 def _dispatch(tool_name: str, params: dict) -> dict:
+    """
+    Dispatch a tool call. Routes to TrueFoundry MCP Gateway when configured,
+    otherwise falls back to local tool implementations.
+
+    Chaos injection (quarantine/timeout) runs BEFORE this function is called
+    (in call_tool's health-check block), so it works identically for both
+    TrueFoundry and local paths.
+    """
+    from gateway.tfy_mcp_client import is_tfy_mcp_configured, _call_tfy_tool_async
+    if is_tfy_mcp_configured():
+        logger.info(f"[MCPGateway] Routing {tool_name} → TrueFoundry MCP Gateway")
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            result = loop.run_until_complete(_call_tfy_tool_async(tool_name, params))
+            loop.close()
+            return result
+        except Exception as exc:
+            logger.warning(f"[MCPGateway] TrueFoundry routing failed ({exc}) — falling back to local")
+
+    # Local tool dispatch
     from tools.github_deploy import deploy
     from tools.validator import validate
     from tools.notifier import notify

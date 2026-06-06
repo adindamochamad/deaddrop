@@ -1,12 +1,12 @@
 import os
+import json
 import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from agent.orchestrator import create_job, process_job
 from agent.checkpoint import CheckpointManager
-from agent.events import get_bus
-from db.models import get_session, DeploymentJob, ToolAuditLog, GuardrailsLog, ProviderLog
+from db.models import get_session, DeploymentJob, ToolAuditLog, GuardrailsLog, ProviderLog, AgentEventRow
 from demo import chaos_injector
 
 logger = logging.getLogger(__name__)
@@ -105,9 +105,12 @@ def get_metrics():
             for g in recent_gr
         ]
 
-        # Whether TrueFoundry native guardrails are wired up to LLM calls
+        from gateway.ai_gateway import get_routing_mode, get_cb_states
         tfy_guardrails_configured = bool(
             os.getenv("TFY_GUARDRAIL_INPUT_ID") or os.getenv("TFY_GUARDRAIL_OUTPUT_ID")
+        )
+        guardrails_mode = (
+            "tfy_native" if tfy_guardrails_configured else "local_regex"
         )
 
         return {
@@ -123,6 +126,10 @@ def get_metrics():
             "total_recovery_ms": total_recovery_ms,
             "recent_providers": provider_log,
             "recent_guardrails": guardrails_log,
+            "routing_mode": get_routing_mode(),
+            "guardrails_mode": guardrails_mode,
+            "tfy_guardrails_configured": tfy_guardrails_configured,
+            "circuit_breakers": get_cb_states(),
         }
     finally:
         session.close()
@@ -132,23 +139,48 @@ def get_metrics():
 
 @router.get("/events")
 def event_stream():
-    """Server-Sent Events endpoint — streams live agent events to dashboard."""
-    bus = get_bus()
+    """Server-Sent Events endpoint — polls MySQL so worker-process events are visible."""
+    import time
 
     def generate():
-        sub = bus.subscribe()
-        # Send buffered recent events on connect
-        for event in bus.recent():
-            yield event.to_sse()
+        # Seed cursor: last 100 events already in DB
+        session = get_session()
+        try:
+            recent = (
+                session.query(AgentEventRow)
+                .order_by(AgentEventRow.id.desc())
+                .limit(100)
+                .all()
+            )
+            recent.reverse()
+            cursor_id = 0
+            for row in recent:
+                yield f"data: {json.dumps({'job_id': row.job_id, 'level': row.level, 'message': row.message, 'ts': row.ts})}\n\n"
+                cursor_id = row.id
+        finally:
+            session.close()
+
         try:
             while True:
-                events = sub.wait_and_drain(timeout=20.0)
-                for event in events:
-                    yield event.to_sse()
+                time.sleep(0.5)
+                session = get_session()
+                try:
+                    new_rows = (
+                        session.query(AgentEventRow)
+                        .filter(AgentEventRow.id > cursor_id)
+                        .order_by(AgentEventRow.id)
+                        .limit(50)
+                        .all()
+                    )
+                    for row in new_rows:
+                        yield f"data: {json.dumps({'job_id': row.job_id, 'level': row.level, 'message': row.message, 'ts': row.ts})}\n\n"
+                        cursor_id = row.id
+                finally:
+                    session.close()
                 # Keepalive
                 yield ": ping\n\n"
-        finally:
-            sub.close()
+        except GeneratorExit:
+            pass
 
     return StreamingResponse(
         generate(),

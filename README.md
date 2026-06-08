@@ -1,6 +1,6 @@
 # DeadDrop — Resilient Deployment Agent
 
-> 🎥 **WATCH VIDEO FIRST** (2 min): [YouTube Link — placeholder](https://youtu.be/PLACEHOLDER)  
+> 🎥 **WATCH VIDEO FIRST** (2 min): [DeadDrop Demo — YouTube](https://youtu.be/9vugLt3eyJA)  
 > Judges: Start here before reading technical details.
 
 > **"Infrastructure dies. Your agent doesn't."**

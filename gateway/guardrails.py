@@ -26,9 +26,10 @@ def process_output(text: str, job_id: str | None = None) -> str:
 
 def validate_tool_args(tool_name: str, args: dict, job_id: str | None = None) -> dict:
     """Validate tool arguments before execution."""
-    # For tools that take YAML/JSON content, validate syntax
-    if "content" in args:
-        _validate_yaml_json(args["content"], job_id)
+    # Validasi sintaks untuk field konten YAML/JSON (validator + github_deploy)
+    for field_konten in ("content", "config_content"):
+        if field_konten in args and args[field_konten]:
+            _validate_yaml_json(args[field_konten], job_id)
     return args
 
 

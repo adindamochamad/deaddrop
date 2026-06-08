@@ -27,17 +27,39 @@ _checkpoint = CheckpointManager()
 def _strip_code_fences(text: str) -> str:
     """
     Extract clean YAML from LLM output.
-    Handles: markdown fences, explanatory prose before YAML, multiple docs.
+    Handles: markdown fences, unclosed fences, prose before YAML, multiple blocks.
     """
     text = text.strip()
 
-    # Case 1: wrapped in ```yaml ... ``` or ``` ... ```
-    fence_match = re.search(r"```(?:yaml|yml)?\n(.*?)```", text, re.DOTALL)
-    if fence_match:
-        return fence_match.group(1).strip()
+    # Ambil semua blok berpagar; prioritaskan yang berisi manifest Kubernetes
+    blok_fences = re.findall(
+        r"```(?:yaml|yml|json)?\s*\n(.*?)```",
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if blok_fences:
+        for blok in sorted(blok_fences, key=len, reverse=True):
+            if re.search(r"apiVersion:", blok, re.IGNORECASE):
+                return blok.strip()
+        return blok_fences[0].strip()
 
-    # Case 2: starts with prose, then YAML begins at apiVersion: or ---
-    yaml_start = re.search(r"^(apiVersion:|---\n)", text, re.MULTILINE)
+    # Pagar pembuka tanpa penutup — ambil isi setelah ```yaml sampai akhir
+    tanpa_penutup = re.search(
+        r"```(?:yaml|yml|json)?\s*\n(.+)",
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if tanpa_penutup:
+        isi = tanpa_penutup.group(1).strip()
+        isi = re.sub(r"\n```\s*$", "", isi)
+        return isi.strip()
+
+    # Bersihkan baris ``` tersisa di mana pun
+    text = re.sub(r"^```(?:yaml|yml|json)?\s*$", "", text, flags=re.MULTILINE | re.IGNORECASE)
+    text = re.sub(r"^```\s*$", "", text, flags=re.MULTILINE)
+
+    # Prosa di awal, YAML mulai di apiVersion: atau ---
+    yaml_start = re.search(r"^(apiVersion:|---\s*\n)", text, re.MULTILINE | re.IGNORECASE)
     if yaml_start:
         return text[yaml_start.start():].strip()
 
@@ -46,16 +68,27 @@ def _strip_code_fences(text: str) -> str:
 
 def _sanitize_manifest(text: str) -> str:
     """
-    Remove redaction markers that break YAML syntax.
-    TrueFoundry guardrail replaces secrets with *** which is a YAML alias char.
-    Replace with the safe string 'REDACTED' before validation.
+    Perbaiki marker redaksi yang merusak sintaks YAML sebelum validasi tool.
     """
-    # *** patterns from TrueFoundry secrets-detection guardrail
-    text = re.sub(r'\*{3,}', 'REDACTED', text)
-    # [REDACTED] from our local guardrail — already valid in YAML strings
-    # but strip if it appears as a bare value that might confuse YAML
-    text = re.sub(r'^\[REDACTED\]\s*$', 'REDACTED', text, flags=re.MULTILINE)
-    return text
+    # TrueFoundry guardrail kadang mengganti secret dengan *** (alias YAML)
+    text = re.sub(r"\*{3,}", "REDACTED", text)
+
+    # Key terpotong redaksi tanpa colon: PAYMENT_GATEWAY_API_[REDACTED]
+    text = re.sub(
+        r"^(\s*)([A-Za-z0-9_.-]+)_\[REDACTED\]\s*$",
+        r'\1\2_REDACTED: "REDACTED"',
+        text,
+        flags=re.MULTILINE,
+    )
+    # [REDACTED] di tengah nama key
+    text = re.sub(r"(\w+)\[REDACTED\]", r"\1_REDACTED", text)
+    # Nilai bare [REDACTED] → string YAML aman
+    text = re.sub(r":\s*\[REDACTED\]", ': "REDACTED"', text)
+    text = re.sub(r"^\[REDACTED\]\s*$", '"REDACTED"', text, flags=re.MULTILINE)
+
+    # Sisa baris fence setelah strip
+    text = re.sub(r"^```\s*$", "", text, flags=re.MULTILINE)
+    return text.strip()
 
 def _backoff(attempt: int) -> float:
     """Exponential backoff with full jitter: sleep [0, min(cap, base * 2^attempt)]."""
@@ -192,6 +225,7 @@ def _run_step_with_retry(job_id, handler, cb_manager, sm, enter_state, success_s
 
         try:
             handler(job_id, job, cb_manager)
+            _checkpoint.clear_error(job_id)
 
             sm.transition(success_state)
             _checkpoint.transition(job_id, success_state.value)

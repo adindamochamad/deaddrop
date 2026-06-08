@@ -93,7 +93,12 @@ async def cek_semua_dependency() -> dict:
 
 def status_keseluruhan(dependencies: dict) -> str:
     """Tentukan status agregat: ok, degraded, atau error."""
-    status_db = {v.get("status") for v in dependencies.values()}
+    # Hanya entry health check (dict berisi "status"); metadata seperti routing_mode diabaikan
+    status_db = {
+        v["status"]
+        for v in dependencies.values()
+        if isinstance(v, dict) and "status" in v
+    }
     if "error" in status_db:
         return "degraded" if dependencies.get("mysql", {}).get("status") == "ok" else "error"
     if "degraded" in status_db:

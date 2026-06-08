@@ -65,6 +65,18 @@ class CheckpointManager:
         finally:
             session.close()
 
+    def clear_error(self, job_id: str):
+        """Hapus last_error setelah step berhasil — hindari error stale di dashboard."""
+        session = get_session()
+        try:
+            job = session.get(DeploymentJob, job_id)
+            if job and job.last_error:
+                job.last_error = None
+                job.updated_at = datetime.utcnow()
+                session.commit()
+        finally:
+            session.close()
+
     def increment_metric(self, job_id: str, field: str, amount: int = 1):
         session = get_session()
         try:
